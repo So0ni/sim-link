@@ -1,0 +1,10 @@
+# Dependencies and generated build output
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Generated test output (curated qa/ evidence stays versioned)
+coverage/
+test-results/
+playwright-report/

@@ -1,0 +1,18 @@
+# Gradle, Kotlin, and native build caches
+.gradle/
+.kotlin/
+build/
+.cxx/
+.externalNativeBuild/
+
+# Machine-specific SDK paths and IDE metadata
+local.properties
+*.iml
+
+# Signing credentials and generated application packages
+keystore.properties
+signing.properties
+*.jks
+*.keystore
+*.apk
+*.aab

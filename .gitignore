@@ -1,0 +1,18 @@
+# OS and local editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~
+
+# Local environment and secrets; sanitized templates stay versioned
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+!.env.*.template
+
+# Runtime logs
+*.log
