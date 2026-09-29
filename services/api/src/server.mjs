@@ -2,6 +2,7 @@ import { createApp } from "./app.mjs";
 process.umask(0o077);
 const app = createApp({
   database: process.env.DATABASE_PATH ?? "./data/simlink.sqlite",
+  trustedProxyAddresses: process.env.TRUSTED_PROXIES ?? "",
   webRoot: process.env.WEB_ROOT,
   origin: process.env.PUBLIC_ORIGIN ?? "https://localhost",
   insecureLocal: process.env.ALLOW_INSECURE_LOCAL === "1",

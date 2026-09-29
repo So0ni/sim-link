@@ -11,6 +11,7 @@ export function configureHttp(app, staticRoot) {
       : error.statusCode >= 400 && error.statusCode < 500
         ? error.statusCode
         : 500;
+    if (status === 429 && Number.isFinite(error.retryAfter)) reply.header("Retry-After", String(error.retryAfter));
     reply
       .code(status)
       .send({

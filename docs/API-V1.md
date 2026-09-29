@@ -14,16 +14,24 @@
 | GET `/api/v1/auth/session` | Cookie | id、expiresAt、csrfToken；不续期 |
 | POST `/api/v1/auth/resume` | Cookie、CSRF、Origin | ok；前台恢复时调用，每日至多续期一次 |
 | POST `/api/v1/auth/logout` | Cookie、CSRF、Origin | 撤销服务端会话，清除 Cookie |
-| GET `/api/v1/auth/sessions` | Cookie | sessions：id、expiresAt、lastActiveAt |
+| GET `/api/v1/auth/sessions` | Cookie | sessions：id、name、current、createdAt、expiresAt、lastActiveAt |
 | DELETE `/api/v1/auth/sessions/:id` | Cookie、CSRF、Origin | 撤销指定网页会话 |
 
-90 天不活跃过期，会话摘要与期限存 SQLite，普通服务重启不退出。GET 轮询、设备上传均不续期。csrfToken 只存客户端内存，需要时通过 session 恢复；不得将 Cookie 或设备凭证写入前端 localStorage。登录全局限流每分钟 10 次（单管理员初版，失败和成功均计数）；不依赖不可信 X-Forwarded-For。会话显示名和精确最近使用时间尚未实现，lastActiveAt 是最近一次续期时间。
+90 天不活跃过期，会话摘要与期限存 SQLite，普通服务重启不退出。GET 轮询、设备上传均不续期。csrfToken 只存客户端内存，需要时通过 session 恢复；不得将 Cookie 或设备凭证写入前端 localStorage。登录保护见下节；默认不信任转发 IP。会话显示名和精确最近使用时间尚未实现，lastActiveAt 是最近一次续期时间。
+
+### 登录限流与代理（SQLite v8）
+
+登录通过 Origin 与请求格式检查后，按来源 IP 限流。IPv4 使用完整地址，IPv4-mapped IPv6 归一化，IPv6 按 /64 聚合。15 分钟内累计 5 次密码失败触发 60 秒冷却，之后每次冷却结束再失败，冷却依次为 120、240、480、900 秒，最高 900 秒。拦截期间不延长冷却；校验成功清除该来源失败记录；触发冷却后的失败记录最后更新 24 小时后过期。来源摘要、失败次数、冷却时间持久化到 SQLite，重启不清零。全局每 60 秒最多开始 30 次密码校验（成功失败均计数），每进程最多同时 2 次；并发满额返回 2 秒等待，不排队占用资源。持续分布式攻击仍可占用全局额度；此保护不替代入口流量防护。
+
+限流响应为 `429 {"error":"try_later"}`，`Retry-After` 响应头为剩余整数秒。第五次错误密码可直接返回 429；一般密码错误仍为 401。PWA 根据响应头倒计时并暂时禁用提交，刷新页面不能绕过服务端限制；已有会话和 Android 凭证不受登录冷却影响。旧 PWA 可继续处理 429，旧 APK 无需升级。
+
+`TRUSTED_PROXIES` 为显式逗号分隔 IP/CIDR 白名单，默认空。只有可信代理链上的 X-Forwarded-For 可用于来源判定，从右向左遇到首个不可信地址即停止；不信任所有代理、跳数或客户端任意 CF-Connecting-IP。代理必须覆盖或正确追加实际客户端地址，源站应限制为代理可达。部署步骤见后端 README。SQLite v8 新增 login_failures；升级前备份，旧服务端不能直接打开升级后的数据库。
 
 ## 配对和撤销
 
 1. 已登录网页 POST `/api/v1/pairings`（CSRF/Origin），获得 `{ pairingToken, expiresAt, server, apiVersion: 1 }`。有效 5 分钟，一次性，令牌 256 位随机，不是短数字码。Web 本地生成配对二维码；也保留手动输入完整令牌。
 2. Android 确认服务器域名后 POST `/api/v1/device/pair`：`{ pairingToken, name, apiVersion: 1 }`，获得 `{ deviceId, deviceToken, apiVersion: 1 }`。原子消费令牌；重复/过期均返回 400 pairing_invalid_or_expired，避免泄漏额外信息。
-3. 配对请求全局每分钟 20 次；创建令牌每分钟 10 次。限流记录持久化，重启不清空；满额返回 429 try_later，客户端等待至少一分钟再试。
+3. 配对请求全局每分钟 20 次；创建令牌每分钟 10 次。限流记录持久化，重启不清空；满额返回 429 try_later，响应 Retry-After 给出剩余等待秒数。
 4. Android 用受保护存储保存 deviceToken，之后请求带 `Authorization: Bearer <deviceToken>`。浏览器会话与设备令牌不能互用。
 5. GET `/api/v1/devices`（Cookie）列出 id/name/createdAt/revokedAt；DELETE `/api/v1/devices/:id`（CSRF/Origin）立即撤销设备后续上传，保留已有短信。
 
@@ -158,3 +166,9 @@ Android先持久化领取游标，再领取；收到命令后在同一事务保�
 ## Web Push（2026-09-29）
 
 新增管理员会话 `/api/v1/push` 接口，订阅归属当前会话，写操作使用现有 Origin/CSRF 策略；Android 协议不变。字段、限流、状态与兼容边界见 [Web Push 接口](WEB-PUSH.md#接口)。
+
+### 网页登录会话列表
+
+`GET /api/v1/auth/sessions` 仅返回未过期会话，当前会话置顶，其余按最近访问排序。`name` 为 User-Agent 推断的粗粒度系统/浏览器描述，不保存原始 User-Agent 或 IP，不代表硬件唯一身份。`current` 为布尔值；`createdAt` 是本次密码登录创建会话的时间；`lastActiveAt` 在登录或显式前台 `/auth/resume` 时更新，普通 API 读取、通知和轮询不更新。时间单位为毫秒。
+
+SQLite v9 新增独立会话元数据表；旧会话保留有效凭证，未记录的时间为 null，前台恢复只补最近访问，不推测初次登录时间。续期与元数据更新在同一事务中，不能复活已撤销会话。注销级联清除该会话的元数据、推送订阅及待发通知，不影响 Android 凭证和短信。新增响应字段兼容既有客户端；Android 无需升级。

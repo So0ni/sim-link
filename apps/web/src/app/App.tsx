@@ -1,3 +1,4 @@
+import { SessionSettings } from "../features/auth/SessionSettings.tsx";
 import { PushSettings } from '../features/push/PushSettings.tsx';
 import { PageBrand } from "../shared/ui/PageBrand.tsx";
 import { VIEW_CACHE_KEY } from "../shared/api/viewCache.ts";
@@ -115,6 +116,7 @@ export function App() {
           <PageBrand /><div className="title-row"><h1>设置</h1></div>
           <PushSettings api={auth.api} />
           <PwaSettings />
+          <SessionSettings api={auth.api} />
           <section className="live-card">
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>

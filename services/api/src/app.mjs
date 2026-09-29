@@ -1,3 +1,5 @@
+import { trustedProxies } from "./platform/trusted-proxies.mjs";
+import { createLoginLimit } from "./modules/auth/login-limit.mjs";
 import { createPushService } from './modules/push/service.mjs';
 import { registerPushRoutes } from './modules/push/routes.mjs';
 import Fastify from "fastify";
@@ -27,6 +29,7 @@ export function createApp({
   insecureLocal = false,
   insecureHttp = false,
   webRoot,
+  trustedProxyAddresses = "",
   now = Date.now,
   pushSender,
 } = {}) {
@@ -48,11 +51,12 @@ export function createApp({
   }
   const staticRoot = webRoot ? resolve(webRoot) : null;
   if (staticRoot) accessSync(join(staticRoot, "index.html"));
+  const proxyTrust = trustedProxies(trustedProxyAddresses);
   const db = openStore(database);
   const app = Fastify({
     logger: false,
     bodyLimit: 128 * 1024,
-    trustProxy: false,
+    trustProxy: proxyTrust,
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
   });
   app.decorate("store", db);
@@ -60,11 +64,13 @@ export function createApp({
   configureHttp(app, staticRoot);
   const auth = createAuthService(db, now);
   const push = createPushService(db, now, origin, pushSender);
+  const rate = createRateLimit(db, now);
   const dependencies = {
+    loginLimit: createLoginLimit(db, now, rate),
     push,
     auth,
     sessions: createSessionPolicy(auth, origin),
-    rate: createRateLimit(db, now),
+    rate,
     devices: createDeviceService(db, now, origin),
     inbox: createInboxService(db, now, push.enqueueMessage),
     sims: createSimService(db, now),

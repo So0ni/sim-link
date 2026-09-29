@@ -191,3 +191,23 @@
 
 .push-actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .push-actions button { min-height: 48px; }
+
+.session-list { list-style:none; padding:0; margin:0; }
+.session-list > li { padding:16px 0; border-bottom:1px solid var(--borderSubtle); }
+.session-list > li:last-child { border-bottom:0; }
+.session-heading { display:flex; align-items:center; gap:12px; justify-content:space-between; min-height:44px; }
+.session-heading strong { min-width:0; overflow-wrap:anywhere; }
+.session-heading button, .session-current { flex-shrink:0; }
+.session-current { color:var(--primary); font-size:13px; }
+.session-list dl { margin:8px 0 0; font-size:13px; color:var(--textSecondary); }
+.session-list dl > div { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:4px; }
+.session-list dt { min-width:4em; }
+.session-list dd { margin:0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.session-placeholder { height:130px; background:var(--surfaceSubtle); border-radius:12px; }
+.session-dialog { width:min(440px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow:auto; border:1px solid var(--borderSubtle); border-radius:16px; padding:24px; color:var(--textPrimary); }
+.session-dialog::backdrop { background:rgba(0,0,0,.35); }
+.session-dialog h2 { margin-top:0; }
+.session-dialog p { line-height:1.6; }
+.session-dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; }
+.session-settings > p { margin:0; }
+.session-settings { gap:12px; }

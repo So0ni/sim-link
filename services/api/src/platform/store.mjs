@@ -11,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 7) {
+  if (version > 9) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -101,6 +101,17 @@ export function openStore(path) {
       CREATE INDEX push_jobs_due ON push_jobs(state,next_at);
       PRAGMA user_version=7;
     `);
+  })();
+  if (version < 8) db.transaction(() => {
+    db.exec(`CREATE TABLE login_failures (source TEXT PRIMARY KEY, failures INTEGER NOT NULL,
+      blocked_until INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+      CREATE INDEX login_failures_expiry ON login_failures(expires_at);
+      PRAGMA user_version=8;`);
+  })();
+  if (version < 9) db.transaction(() => {
+    db.exec(`CREATE TABLE session_details (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, created_at INTEGER, last_active_at INTEGER);
+      PRAGMA user_version=9;`);
   })();
   return db;
 }

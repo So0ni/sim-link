@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     init: true
     environment:
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env}
       ALLOW_INSECURE_LOCAL: ${ALLOW_INSECURE_LOCAL:-0}
       ALLOW_INSECURE_HTTP: ${ALLOW_INSECURE_HTTP:-0}

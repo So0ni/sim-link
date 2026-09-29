@@ -1,13 +1,12 @@
 import { csrf } from "../../platform/crypto.mjs";
 import { object, string } from "../../platform/errors.mjs";
-export function registerAuthRoutes(app, { auth, sessions, rate }) {
+export function registerAuthRoutes(app, { auth, sessions, loginLimit }) {
   app.post(
     "/api/v1/auth/login",
     { schema: { body: object({ password: string(1024, 12) }) } },
     async (req, reply) => {
       sessions.checkOrigin(req);
-      rate("login", 10);
-      const raw = await auth.login(req.body.password);
+      const raw = await loginLimit.verify(req.ip, () => auth.login(req.body.password, req.headers["user-agent"]));
       sessions.cookie(reply, raw);
       return { csrfToken: csrf(raw) };
     },
@@ -22,7 +21,7 @@ export function registerAuthRoutes(app, { auth, sessions, rate }) {
   });
   app.post("/api/v1/auth/resume", async (req, reply) => {
     const session = sessions.write(req);
-    if (auth.resume(session)) sessions.cookie(reply, session.raw);
+    if (auth.resume(session, req.headers["user-agent"])) sessions.cookie(reply, session.raw);
     return { ok: true };
   });
   app.post("/api/v1/auth/logout", async (req, reply) => {
@@ -31,8 +30,8 @@ export function registerAuthRoutes(app, { auth, sessions, rate }) {
     return { ok: true };
   });
   app.get("/api/v1/auth/sessions", async (req) => {
-    sessions.read(req);
-    return { sessions: auth.list() };
+    const current = sessions.read(req);
+    return { sessions: auth.list(current.id) };
   });
   app.delete("/api/v1/auth/sessions/:id", async (req) => {
     sessions.write(req);

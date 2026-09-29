@@ -210,3 +210,17 @@ test('automatic reading ignores background, retains queued visibility while busy
   alreadyRead.collect([{...m,isRead:true}],true,false);
   assert.deepEqual(alreadyRead.collect([m],true,false),[]);
 });
+
+import { ApiError, parseRetryAfter, errorText } from '../src/shared/api/client.ts';
+test('Retry-After seconds and HTTP dates survive the API error path without invalidating login', async t => {
+  assert.equal(parseRetryAfter('120'),120);
+  assert.equal(parseRetryAfter('Tue, 29 Sep 2026 10:00:05 GMT',Date.parse('2026-09-29T10:00:00Z')),5);
+  assert.equal(parseRetryAfter('garbage'),null);
+  assert.equal(parseRetryAfter(null),null);
+  const previous = globalThis.fetch;
+  t.after(()=>{globalThis.fetch=previous;});
+  globalThis.fetch=async()=>new Response('{}',{status:429,headers:{'Retry-After':'37'}});
+  const api=new ApiClient(); let unauthorized=false; api.onUnauthorized=()=>{unauthorized=true;};
+  await assert.rejects(api.request('/auth/login',{method:'POST',body:{password:'fictional-password'},authenticated:false}),e=>e instanceof ApiError && e.retryAfter===37 && errorText(e).includes('37'));
+  assert.equal(unauthorized,false);
+});
