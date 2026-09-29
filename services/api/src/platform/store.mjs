@@ -10,7 +10,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 2) {
+  if (version > 3) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -43,6 +43,18 @@ export function openStore(path) {
       PRAGMA user_version = 2;
     `);
     db.prepare("UPDATE sqlite_sequence SET seq=MAX(seq, ?) WHERE name='messages'").run(sequence);
+  })();
+  if (version < 3) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE sims (id TEXT PRIMARY KEY,device_id TEXT NOT NULL,local_key TEXT NOT NULL,
+        subscription_id INTEGER NOT NULL,slot_index INTEGER NOT NULL,carrier TEXT NOT NULL,
+        name TEXT NOT NULL DEFAULT '',phone_number TEXT NOT NULL DEFAULT '',state TEXT NOT NULL,reported_at INTEGER NOT NULL,
+        UNIQUE(device_id,local_key));
+      ALTER TABLE devices ADD COLUMN inventory_status TEXT;
+      ALTER TABLE devices ADD COLUMN inventory_at INTEGER;
+      ALTER TABLE messages ADD COLUMN sim_key TEXT;
+      PRAGMA user_version=3;
+    `);
   })();
   return db;
 }

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText, type ApiClient } from "../../shared/api/client.ts";
 import { getMessages, type ReceivedMessage } from "./api.ts";
 import { ForegroundPoller } from "../../shared/api/polling.ts";
+import { listSims, type Sim } from "../sims/api.ts";
 import { mergeMessages } from "./model.ts";
 export function useInbox(api: ApiClient) {
+  const [sims, setSims] = useState<Sim[]>([]);
   const [messages, setMessages] = useState<ReceivedMessage[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
@@ -24,6 +26,9 @@ export function useInbox(api: ApiClient) {
         cursor.current = page.nextCursor;
         if (page.messages.length < 100) break;
       }
+      const inventory = await listSims(api, controller.signal);
+      if (controller.signal.aborted) return false;
+      setSims(inventory.sims);
       setError("");
       setUpdatedAt(Date.now());
       return true;
@@ -52,5 +57,5 @@ export function useInbox(api: ApiClient) {
       active.current = null;
     };
   }, [refresh]);
-  return { messages, error, busy, updatedAt, refresh };
+  return { messages, sims, error, busy, updatedAt, refresh };
 }

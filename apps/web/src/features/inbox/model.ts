@@ -1,10 +1,25 @@
+import { mappingKey, simTitle, type Sim } from "../sims/api.ts";
 import type { ReceivedMessage } from "./api.ts";
 export const simKey = (m: ReceivedMessage) =>
-  JSON.stringify([m.deviceId, m.subscriptionId]);
+  JSON.stringify([m.deviceId, m.simKey ?? m.subscriptionId]);
 export const conversationKey = (m: ReceivedMessage) =>
-  JSON.stringify([m.deviceId, m.subscriptionId, m.sender]);
-export const simLabel = (m: ReceivedMessage) =>
-  `设备 ${m.deviceId.slice(0, 8)} · ${m.subscriptionId === null ? "SIM 未知" : `订阅 ${m.subscriptionId}`}`;
+  JSON.stringify([m.deviceId, m.simKey ?? m.subscriptionId, m.sender]);
+export function simLabel(m: ReceivedMessage, sims: Sim[] = []) {
+  const mapping = m.simKey && sims.find(s => s.deviceId === m.deviceId && s.simKey === m.simKey);
+  if (mapping) return simTitle(mapping);
+  return `设备 ${m.deviceId.slice(0, 8)} · ${m.subscriptionId === null ? "SIM 未知" : `订阅 ${m.subscriptionId}`}${m.simKey ? ` · ${m.simKey.slice(-4)}` : " · 未关联卡片"}`;
+}
+export function simTabs(messages: ReceivedMessage[], sims: Sim[]) {
+  const labels = [...new Map([
+    ...sims.filter(s => s.state === "active").map(s => [mappingKey(s), simTitle(s)] as const),
+    ...messages.map(m => [simKey(m), simLabel(m, sims)] as const),
+  ]).entries()];
+  return labels.map(([key, label]) => {
+    if (labels.filter(([, other]) => other === label).length === 1) return [key, label];
+    const [device, mapping] = JSON.parse(key) as [string, string | number | null];
+    return [key, `${label} · ${device.slice(0, 8)}/${String(mapping).slice(-4)}`];
+  });
+}
 export function mergeMessages(
   previous: ReceivedMessage[],
   incoming: ReceivedMessage[],

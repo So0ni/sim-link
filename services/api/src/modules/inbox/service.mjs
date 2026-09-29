@@ -6,6 +6,7 @@ export function createInboxService(db, now) {
       .get(dev.id, body.eventId);
     if (old) {
       if (
+        old.sim_key !== (body.simKey ?? null) ||
         old.sender !== body.sender ||
         old.body !== body.body ||
         old.subscription_id !== body.subscriptionId ||
@@ -19,11 +20,12 @@ export function createInboxService(db, now) {
         duplicate: true,
       };
     }
+    if (body.simKey && body.subscriptionId === null) fail(400, "sim_requires_subscription");
     const stamp = now();
     if (body.receivedAt > stamp + 300000) fail(400, "received_at_in_future");
     const result = db
       .prepare(
-        "INSERT INTO messages(device_id,event_id,sender,body,subscription_id,received_at,synced_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO messages(device_id,event_id,sender,body,subscription_id,received_at,synced_at,sim_key) VALUES (?,?,?,?,?,?,?,?)",
       )
       .run(
         dev.id,
@@ -33,6 +35,7 @@ export function createInboxService(db, now) {
         body.subscriptionId,
         body.receivedAt,
         stamp,
+        body.simKey ?? null,
       );
     return {
       eventId: body.eventId,
@@ -50,7 +53,7 @@ export function createInboxService(db, now) {
       const messages = db
         .prepare(
           `SELECT sequence, device_id AS deviceId, event_id AS eventId, sender, body,
-      subscription_id AS subscriptionId, received_at AS receivedAt, synced_at AS syncedAt
+      subscription_id AS subscriptionId, sim_key AS simKey, received_at AS receivedAt, synced_at AS syncedAt
       FROM messages WHERE sequence>? ORDER BY sequence LIMIT 100`,
         )
         .all(Number(after));

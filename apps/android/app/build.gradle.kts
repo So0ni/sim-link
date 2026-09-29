@@ -6,8 +6,8 @@ android {
         applicationId = "dev.simlink.gateway"
         minSdk = 34
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.2.3-p1"
+        versionCode = 6
+        versionName = "0.3.0-p1"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

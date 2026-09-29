@@ -7,7 +7,7 @@ import {
 } from "@phosphor-icons/react";
 import type { ApiClient } from "../../shared/api/client.ts";
 import { useInbox } from "./useInbox.ts";
-import { conversations, simKey, simLabel } from "./model.ts";
+import { conversations, simKey, simLabel, simTabs } from "./model.ts";
 export function InboxPage({
   api,
   selected,
@@ -20,9 +20,7 @@ export function InboxPage({
   const inbox = useInbox(api);
   const [sim, setSim] = useState("all");
   const [copyResult, setCopyResult] = useState("");
-  const tabs = [
-    ...new Map(inbox.messages.map((m) => [simKey(m), simLabel(m)])).entries(),
-  ];
+  const tabs = simTabs(inbox.messages, inbox.sims);
   const items = conversations(inbox.messages).filter(
     (c) => sim === "all" || simKey(c.messages[0]) === sim,
   );
@@ -107,7 +105,7 @@ export function InboxPage({
                       </time>
                     </div>
                     <p>{last.body}</p>
-                    <span className="sim-tag">{simLabel(last)}</span>
+                    <span className="sim-tag">{simLabel(last, inbox.sims)}</span>
                   </div>
                 </a>
               </article>
@@ -129,7 +127,7 @@ export function InboxPage({
               </button>
               <div>
                 <h2>{active.messages[0].sender}</h2>
-                <p>{simLabel(active.messages[0])}</p>
+                <p>{simLabel(active.messages[0], inbox.sims)}</p>
               </div>
             </header>
             <div className="message-scroll">

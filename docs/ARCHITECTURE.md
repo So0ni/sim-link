@@ -58,3 +58,5 @@ Android 已随 P1 接入分为 ui、connection、sync、telephony、data、platf
 ## 验证与变更约束
 
 后端接口回归覆盖鉴权、配对竞争、幂等与持久化；Web 模型测试覆盖异步会话与分组；浏览器验证真实登录、刷新、详情、退出及响应式；Compose 验证实际构建和重建持久化。演示数据只用于独立测试库，不上传真实短信。每次扩展记录已实现的端、兼容策略和未验证的真机行为。
+
+SIM inventory and immutable message mapping: [SIM-MAPPING.md](SIM-MAPPING.md). API business ownership: modules/sims; Android observation: telephony/SimInventory; Web editing and labels: features/sims.

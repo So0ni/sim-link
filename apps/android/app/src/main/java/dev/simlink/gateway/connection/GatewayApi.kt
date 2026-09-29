@@ -55,6 +55,7 @@ class GatewayApi(private val server: String, private val cancellation: RequestCa
         check(deviceId.isNotBlank() && Regex("[A-Za-z0-9_-]{43}").matches(deviceToken))
         return deviceId to deviceToken
     }
+    fun inventory(body: JSONObject, token: String) { check(request("/api/v1/device/sims", body, token).getBoolean("ok")) }
     fun heartbeat(token: String) { check(request("/api/v1/device/heartbeat", JSONObject(), token).getLong("receivedAt") >= 0) }
     fun unpair(token: String) {
         try { check(request("/api/v1/device/unpair", JSONObject(), token).getBoolean("ok")) }

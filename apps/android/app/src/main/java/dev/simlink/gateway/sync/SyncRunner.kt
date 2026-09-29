@@ -11,7 +11,7 @@ import java.util.concurrent.Executors
 
 /** Network tasks never use the SMS receiver's DB executor. */
 object NetworkIo { val executor = Executors.newSingleThreadExecutor() }
-class SyncRunner(context: Context) {
+class SyncRunner(private val context: Context) {
     private val connections = ConnectionStore(context)
     private val queue = SyncQueue(context)
     fun run(cancellation: RequestCancellation): Boolean {
@@ -30,15 +30,24 @@ class SyncRunner(context: Context) {
             override fun pause(generation: String, notice: String) = connections.pause(generation, notice)
             override fun notice(generation: String, notice: String) = connections.notice(generation, notice)
         }
+        var inventorySupported = false
         return SyncEngine(storage, { event, token ->
             val body = JSONObject().put("eventId", event.id).put("sender", event.address).put("body", event.body)
                 .put("subscriptionId", if (event.subId >= 0) event.subId else JSONObject.NULL).put("receivedAt", event.time)
+            if (event.simKey != null) {
+                if (!inventorySupported) throw UploadFailure(503) // Keep the immutable mapping until the server is upgraded/reachable.
+                body.put("simKey", event.simKey)
+            }
             try {
                 val result = api.upload(body, token)
                 UploadAck(result.getString("eventId"), result.getLong("sequence"), result.getLong("syncedAt"))
             } catch (error: ApiFailure) { throw UploadFailure(error.status) }
         }, { cancellation.stopped.get() }, { token ->
-            try { api.heartbeat(token) } catch (error: ApiFailure) { throw UploadFailure(error.status) }
+            try {
+                api.heartbeat(token)
+                api.inventory(dev.simlink.gateway.telephony.SimInventory(context).refresh().json(), token)
+                inventorySupported = true
+            } catch (error: ApiFailure) { throw UploadFailure(error.status) }
         }).run()
     }
 }

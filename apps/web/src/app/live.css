@@ -68,3 +68,9 @@
 
 .pairing-qr { background: white; width: fit-content; max-width: 100%; border-radius: 12px; }
 .pairing-qr svg { display: block; max-width: 100%; height: auto; }
+
+.sim-editor { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--borderControl); overflow-wrap: anywhere; }
+.sim-actions { display: flex; gap: 12px; }
+.live-device > div { min-width: 0; flex: 1; }
+.live-device > button { align-self: flex-start; flex-shrink: 0; }
+@media (max-width: 479px) { .live-device { flex-direction: column; } }

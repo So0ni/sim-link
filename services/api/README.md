@@ -1,6 +1,6 @@
 # SIMLink API · P1 服务端基础
 
-Node.js 22+（容器 Node.js 24）、Fastify 5、better-sqlite3 / SQLite。单管理员、单进程、单数据库，无 Redis。当前提供登录、配对和收件接口；**PWA 已接入登录、收件与设备管理；Android 已实现 P1 配对与上传代码，尚未完成真机联调，远程发送和通知尚未实现。**
+Node.js 22+（容器 Node.js 24）、Fastify 5、better-sqlite3 / SQLite。单管理员、单进程、单数据库，无 Redis。Web 已接入登录、收件、设备与 SIM 管理；Android 核心收件同步已通过真机验收，远程发送和通知尚未实现。当前范围见 [计划](../../docs/PLAN.md)。
 
 ## Docker Compose 部署
 
@@ -114,3 +114,7 @@ docker compose -p simlink-debug stop
 
 
 心跳已接入：设备页展示最后联系与推断在线状态（35 分钟阈值），每 30 秒自动刷新。解除配对删除有效设备条目和凭证，短信保留。数据库升级到 v2 时自动清理旧 revoked_at 条目；迁移前先备份数据卷。旧版仅本地解除但未通知后端的条目需手动在 Web 解除。
+
+### SIM 管理（SQLite v3）
+
+新设备清单接口、Web 备注名/电话号码编辑与消息 simKey 已接通。升级前备份数据卷，先更新本容器，再安装 Android 0.3.0-p1。旧 Android 收件兼容；历史短信不自动关联当前卡。详细规则见 [SIM 映射](../../docs/SIM-MAPPING.md)。

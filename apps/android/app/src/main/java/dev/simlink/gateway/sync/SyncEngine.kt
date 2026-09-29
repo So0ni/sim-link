@@ -1,6 +1,6 @@
 package dev.simlink.gateway.sync
 
-class UploadEvent(val id: String, val address: String, val body: String, val subId: Int, val time: Long)
+class UploadEvent(val id: String, val address: String, val body: String, val subId: Int, val time: Long, val simKey: String? = null)
 class SyncTarget(val generation: String, val enabled: Boolean, val token: () -> String)
 data class UploadAck(val eventId: String, val sequence: Long, val syncedAt: Long)
 class UploadFailure(val status: Int) : Exception()

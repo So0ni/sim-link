@@ -1,3 +1,5 @@
+import { SimEditor } from "../sims/SimEditor.tsx";
+import { listSims, type Sim } from "../sims/api.ts";
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { pairingPayload } from "./pairing.ts";
@@ -10,6 +12,7 @@ import {
   type Pairing,
 } from "./api.ts";
 export function DevicesPage({ api }: { api: ApiClient }) {
+  const [sims, setSims] = useState<Sim[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [error, setError] = useState("");
@@ -19,10 +22,11 @@ export function DevicesPage({ api }: { api: ApiClient }) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    listDevices(api, controller.signal)
-      .then((result) => {
+    Promise.all([listDevices(api, controller.signal), listSims(api, controller.signal)])
+      .then(([result, inventory]) => {
         if (!controller.signal.aborted) {
           setDevices(result.devices);
+          setSims(inventory.sims);
           setError("");
         }
       })
@@ -115,6 +119,10 @@ export function DevicesPage({ api }: { api: ApiClient }) {
               </p>
               <p className="field-help">最近联系：{device.lastSeenAt == null ? "暂无记录" : new Date(device.lastSeenAt).toLocaleString()}</p>
               <p className="field-help">设备编号 {device.id.slice(0, 8)}</p>
+              <p className="field-help">{device.inventoryStatus === "permission_required" ? "请在 Android 授权读取 SIM" : device.inventoryStatus === "unavailable" ? "暂时无法读取 SIM 清单" : device.inventoryStatus == null ? "等待网关上报 SIM 清单" : "SIM 清单已上报"}</p>
+              {device.inventoryAt != null && <p className="field-help">清单更新于 {new Date(device.inventoryAt).toLocaleString()}</p>}
+              {device.inventoryStatus === "available" && !sims.some(s => s.deviceId === device.id && s.state === "active") && <p className="field-help">未检测到在用 SIM。</p>}
+              {sims.filter(s => s.deviceId === device.id).map(sim => <SimEditor key={sim.id} sim={sim} api={api} saved={() => setReload(v => v + 1)} />)}
             </div>
             {!device.revokedAt && (
               <button

@@ -96,3 +96,17 @@ SQLite v2 为设备添加 last_seen_at，并将短信来源 ID 改为独立历�
 
 
 Web 收件流继续使用游标增量轮询，无新接口：可见且联网时，每次请求完成约 5 秒后再请求；每轮最多 20 页，隐藏暂停，重新可见/联网立即检查。请求失败保留游标、列表和登录态（401 除外），退避最长 60 秒。此机制不提供后台系统通知，不表示已实现 Web Push。
+
+## SIM 清单与用户号码（0.3.0-p1）
+
+能力 `sim.inventory`。设备 Bearer 鉴权 `POST /api/v1/device/sims`：
+
+```json
+{"status":"available","sims":[{"key":"00000000-0000-4000-8000-000000000001","subscriptionId":1,"slotIndex":0,"carrier":"Example Mobile"}]}
+```
+
+status 为 available / permission_required / unavailable；后两者 sims 必须为空。最多 16 项，key 与 subscriptionId 各自不能重复，key 为 36 字符小写 UUID 格式，slotIndex 从 0 开始。完整清单替换当前在用状态，历史记录保留；同一 key 不允许改变订阅编号或卡槽（409）。成功 `{ "ok": true }`。上报不会覆盖用户设置的名称和号码。
+
+浏览器会话 `GET /api/v1/sims` 返回 `{sims:[{id,deviceId,simKey,subscriptionId,slotIndex,carrier,name,phoneNumber,state,reportedAt}]}`；state 为 active / inactive / unknown / detached，表示最后上报状态，不等于当前可发送。`PATCH /api/v1/sims/:id` 需 Origin/CSRF，body `{name,phoneNumber}`，备注 0–40 字符、号码输入 0–32 字符，规范化后可空或为可选 + 与 6–20 位数字。400 无效输入、404 记录不存在。号码不用于自动合并设备或历史数据。
+
+设备收件接口增加可选 `simKey`，与事件其他字段一同参与重试冲突检查；提供 simKey 时 subscriptionId 不得为 null。浏览器消息返回 simKey（旧记录为 null）。设备列表增加 inventoryStatus、inventoryAt（未上报为 null）。映射与升级边界见 [SIM-MAPPING.md](SIM-MAPPING.md)。

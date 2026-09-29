@@ -26,11 +26,12 @@ data class LocalMessage(
         summarizeSend(results, interrupted, now - time).label
 }
 
-class MessageStore private constructor(context: Context) {
+class MessageStore private constructor(private val context: Context) {
     private val database = GatewayDatabase.get(context)
     private val writableDatabase get() = database.writableDatabase
     private val readableDatabase get() = database.readableDatabase
     fun insert(id: String, address: String, body: String, subId: Int, time: Long, outgoing: Boolean, count: Int = 0) {
+        val simKey = if (outgoing) null else runCatching { dev.simlink.gateway.telephony.SimInventory(context).refresh().sims.find { it.observation.subscriptionId == subId }?.key }.getOrNull()
         val db = writableDatabase
         db.beginTransaction()
         try {
@@ -41,7 +42,7 @@ class MessageStore private constructor(context: Context) {
             if (inserted != -1L) repeat(count) { i ->
                 db.execSQL("INSERT INTO parts(message_id, part_index) VALUES (?, ?)", arrayOf<Any>(id, i))
             }
-            if (inserted != -1L && !outgoing) SyncQueue.enqueueReceived(db, id)
+            if (inserted != -1L && !outgoing) SyncQueue.enqueueReceived(db, id, simKey)
             db.setTransactionSuccessful()
         } finally { db.endTransaction() }
     }

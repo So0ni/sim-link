@@ -75,3 +75,7 @@ P0 先测非默认应用路线，避免在没有实现默认角色完整职责�
 Debug APK 可勾选内网 HTTP 调试；Release 仍强制 HTTPS，普通证书验证不变。详细后端配置见 [后端部署说明](../../services/api/README.md)。HTTP 未加密，不把它用于公网真实数据。
 
 本轮 Debug、未签名 Release 构建和 JVM 检查通过；release APK 不是可直接安装的正式签名发行版。数据库 v2 迁移/Keystore/JobScheduler 和页面操作尚待在线真机；当前用户尚未部署后端。
+
+### SIM 清单（0.3.0-p1）
+
+使用已有读取 SIM 权限上报卡槽、订阅与运营商，并在收件时固定本地映射。数据库 v3 保留旧队列，旧记录不猜测卡归属。先升级后端再升级 APK；本地映射、号码命名及兼容规则见 [SIM 映射](../../docs/SIM-MAPPING.md)。号码由用户在 Web 设备页手动填写，不增加 READ_PHONE_NUMBERS 权限。

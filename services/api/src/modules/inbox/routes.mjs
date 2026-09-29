@@ -4,22 +4,12 @@ export function registerInboxRoutes(app, { inbox, devices, sessions }) {
     "/api/v1/device/messages",
     {
       schema: {
-        body: object({
-          eventId: string(128),
-          sender: string(256),
-          body: string(32768, 0),
-          subscriptionId: {
-            anyOf: [
-              { type: "integer", minimum: 0, maximum: 2147483647 },
-              { type: "null" },
-            ],
-          },
-          receivedAt: {
-            type: "integer",
-            minimum: 0,
-            maximum: Number.MAX_SAFE_INTEGER,
-          },
-        }),
+        body: { ...object({
+          eventId: string(128), sender: string(256), body: string(32768, 0),
+          subscriptionId: { anyOf: [{ type: "integer", minimum: 0, maximum: 2147483647 }, { type: "null" }] },
+          receivedAt: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+          simKey: { ...string(36, 36), pattern: "^[a-f0-9-]{36}$" },
+        }), required: ["eventId", "sender", "body", "subscriptionId", "receivedAt"] },
       },
     },
     async (req) => {

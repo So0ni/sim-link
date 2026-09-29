@@ -189,11 +189,52 @@ test('v1 migration removes revoked devices without losing SMS IDs or active cred
   db.close();
   const migrated = openStore(path);
   try {
-    assert.equal(migrated.pragma('user_version',{simple:true}),2);
+    assert.equal(migrated.pragma('user_version',{simple:true}),3);
     assert.deepEqual(migrated.prepare('SELECT id,token_hash,last_seen_at FROM devices').all(),[{id:'live',token_hash:'hash-live',last_seen_at:null}]);
     assert.equal(migrated.prepare('SELECT device_id FROM messages WHERE sequence=7').get().device_id,'old');
     assert.deepEqual(migrated.pragma('foreign_key_check'),[]);
     migrated.prepare("INSERT INTO messages(device_id,event_id,sender,body,received_at,synced_at) VALUES('live','next','Example','Fictional',1,2)").run();
     assert.equal(migrated.prepare('SELECT MAX(sequence) AS n FROM messages').get().n,8);
   } finally { migrated.close(); }
+});
+
+test('SIM inventory keeps names/numbers, rejects reused mappings, and preserves historical message identity', async t => {
+  const { app, headers } = await fixture(t);
+  const device = await pair(app, headers);
+  const auth = { authorization: `Bearer ${device.deviceToken}` };
+  const key = '00000000-0000-4000-8000-000000000001';
+  const sim = { key, subscriptionId: 1, slotIndex: 0, carrier: 'Fictional Mobile' };
+  const report = payload => app.inject({ method: 'POST', url: '/api/v1/device/sims', headers: auth, payload });
+  const list = async () => (await app.inject({ url: '/api/v1/sims', headers })).json().sims;
+  assert.equal((await app.inject('/api/v1/sims')).statusCode, 401);
+  assert.equal((await report({ status: 'available', sims: [sim, sim] })).statusCode, 400);
+  assert.equal((await report({ status: 'available', sims: [sim] })).statusCode, 200);
+  const initial = (await list())[0];
+  const update = { method: 'PATCH', url: `/api/v1/sims/${initial.id}`, headers, payload: { name: 'Backup', phoneNumber: '+1 (202) 555-0100' } };
+  assert.equal((await app.inject({ ...update, headers: { cookie: headers.cookie, origin } })).statusCode, 403);
+  assert.equal((await app.inject(update)).statusCode, 200);
+  assert.equal((await app.inject({ ...update, payload: { name: 'Backup', phoneNumber: 'bad-number' } })).statusCode, 400);
+  assert.equal((await report({ status: 'available', sims: [sim] })).statusCode, 200);
+  assert.equal((await list())[0].phoneNumber, '+12025550100');
+  assert.equal((await list())[0].name, 'Backup');
+  assert.equal((await report({ status: 'available', sims: [{ ...sim, slotIndex: 1 }] })).statusCode, 409);
+  assert.equal((await list())[0].state, 'active'); // rollback all status changes
+  const upload = { method: 'POST', url: '/api/v1/device/messages', headers: auth, payload: { ...event, simKey: key } };
+  assert.equal((await app.inject(upload)).statusCode, 200);
+  const replacementKey = '00000000-0000-4000-8000-000000000002';
+  assert.equal((await report({ status: 'available', sims: [{ ...sim, key: replacementKey }] })).statusCode, 200);
+  assert.equal((await list())[0].state, 'inactive');
+  assert.equal((await list())[1].name, '');
+  assert.equal((await list())[1].phoneNumber, '');
+  assert.equal((await app.inject(upload)).json().duplicate, true);
+  assert.equal((await app.inject({ ...upload, payload: { ...event, simKey: replacementKey } })).statusCode, 409);
+  assert.equal((await report({ status: 'permission_required', sims: [] })).statusCode, 200);
+  assert.equal((await list())[1].state, 'unknown');
+  assert.equal((await report({ status: 'available', sims: [] })).statusCode, 200);
+  assert.equal((await list())[1].state, 'inactive');
+  await app.inject({ method: 'DELETE', url: `/api/v1/devices/${device.deviceId}`, headers });
+  assert.equal((await list())[0].state, 'detached');
+  assert.equal((await list())[0].name, 'Backup');
+  assert.equal((await app.inject({ url: '/api/v1/messages', headers })).json().messages[0].simKey, key);
+  assert.equal((await report({ status: 'available', sims: [sim] })).statusCode, 401);
 });

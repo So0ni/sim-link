@@ -6,6 +6,7 @@ export type ReceivedMessage = {
   sender: string;
   body: string;
   subscriptionId: number | null;
+  simKey?: string | null;
   receivedAt: number;
   syncedAt: number;
 };

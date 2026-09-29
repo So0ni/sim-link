@@ -7,6 +7,8 @@ export type Device = {
   lastSeenAt?: number | null;
   presence?: "online" | "offline" | "unknown";
   serverTime?: number;
+  inventoryStatus?: "available" | "permission_required" | "unavailable" | null;
+  inventoryAt?: number | null;
 };
 export type Pairing = {
   pairingToken: string;

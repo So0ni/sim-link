@@ -158,3 +158,26 @@ test("poller backs off failures, resets on success and safely restarts pending w
   release(true); await settle(); assert.equal(calls,2);
   restarted.stop(); release(true); await settle(); assert.equal(clock.pending.size,0);
 });
+
+import { simKey, simLabel } from '../src/features/inbox/model.ts';
+import { mappingKey, simTitle } from '../src/features/sims/api.ts';
+test('SIM phone labels change independently of immutable conversation and historical identity', () => {
+  const sim = { id: 'id', deviceId: 'device', simKey: 'mapping-a', subscriptionId: 1, slotIndex: 0, carrier: 'Test', name: 'Backup', phoneNumber: '+12025550100', state: 'active', reportedAt: 1 };
+  const message = { sequence: 1, deviceId: 'device', simKey: 'mapping-a', subscriptionId: 1, sender: 'Example', body: 'Test', receivedAt: 1, syncedAt: 1, eventId: 'e' };
+  assert.equal(simKey(message), mappingKey(sim));
+  assert.equal(simLabel(message, [sim]), 'Backup · +12025550100');
+  assert.equal(simTitle({ ...sim, name: '' }), '+12025550100');
+  const replaced = { ...message, sequence: 2, simKey: 'mapping-b' };
+  assert.equal(conversations([message, replaced]).length, 2);
+  assert.notEqual(simKey({ ...message, simKey: null }), simKey(message));
+  assert.notEqual(simLabel({ ...message, simKey: null }, [sim]), simTitle(sim));
+});
+
+import { simTabs } from '../src/features/inbox/model.ts';
+test('duplicate phone labels stay distinguishable without merging devices', () => {
+  const sim = { id: 'a', deviceId: 'device-a', simKey: 'mapping-a', subscriptionId: 1, slotIndex: 0, carrier: 'Test', name: '', phoneNumber: '+12025550100', state: 'active', reportedAt: 1 };
+  const tabs = simTabs([], [sim, { ...sim, id: 'b', deviceId: 'device-b' }]);
+  assert.equal(tabs.length, 2);
+  assert.notEqual(tabs[0][0], tabs[1][0]);
+  assert.notEqual(tabs[0][1], tabs[1][1]);
+});

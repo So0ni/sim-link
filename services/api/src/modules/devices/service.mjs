@@ -44,7 +44,7 @@ export function createDeviceService(db, now, origin) {
     list() {
       return db
         .prepare(
-          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt, last_seen_at AS lastSeenAt FROM devices WHERE revoked_at IS NULL ORDER BY created_at",
+          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt, last_seen_at AS lastSeenAt, inventory_status AS inventoryStatus, inventory_at AS inventoryAt FROM devices WHERE revoked_at IS NULL ORDER BY created_at",
         )
         .all().map(device => ({ ...device, presence: device.lastSeenAt === null ? "unknown" : now() - device.lastSeenAt <= 35 * 60 * 1000 ? "online" : "offline", serverTime: now() }));
     },

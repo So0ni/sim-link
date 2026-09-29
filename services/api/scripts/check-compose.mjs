@@ -39,9 +39,14 @@ try {
   const deviceHeaders = { authorization: `Bearer ${device.deviceToken}` };
   await request('/api/v1/device/heartbeat', 'POST', {}, deviceHeaders);
   assert.equal((await request('/api/v1/devices')).body.devices[0].presence, 'online');
+  const mapping = { key: '00000000-0000-4000-8000-000000000001', subscriptionId: 1, slotIndex: 0, carrier: 'Test' };
+  await request('/api/v1/device/sims', 'POST', { status: 'available', sims: [mapping] }, deviceHeaders);
+  const sim = (await request('/api/v1/sims')).body.sims[0];
+  await request(`/api/v1/sims/${sim.id}`, 'PATCH', { name: 'Backup', phoneNumber: '+12025550100' });
   await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   compose(['up', '-d', '--force-recreate', '--wait']);
   await request('/api/v1/auth/session');
+  assert.equal((await request('/api/v1/sims')).body.sims[0].phoneNumber, '+12025550100');
   const replay = await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   assert.equal(replay.body.duplicate, true);
   assert.equal((await request('/api/v1/messages')).body.messages.length, 1);
