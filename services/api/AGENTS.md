@@ -23,6 +23,6 @@
 
 ## 验证
 
-本目录使用 `npm ci`、`npm test`、`npm start`；部署使用 `docker compose up -d --build --wait`；同一镜像托管 PWA，HTTPS 由主机已有代理负责，不在 Compose 提供代理或发布 80/443。`npm run test:compose` 使用独立项目和虚构数据验证容器重建持久化，结束仅删除自己的测试卷。初始化管理员、配置、迁移与备份见 [README](README.md)，接口语义见 [API v1](../../docs/API-V1.md)。不得将测试清理命令作用于用户部署的数据卷。
+本目录使用 `npm ci`、`npm test`、`npm start`；部署使用 `docker compose up -d --build --wait`；同一镜像托管 PWA，HTTPS 由主机已有代理负责，不在 Compose 提供代理或发布 80/443。`npm run test:compose` 使用独立项目和虚构数据验证容器重建持久化，结束仅删除自己的测试卷。小内存服务器可用 `compose.prebuilt.yaml` 加载开发机构建的目标架构镜像，仅绑定回环，复用已有代理/Tunnel；服务器不执行构建。初始化管理员、配置、迁移与备份见 [README](README.md)，接口语义见 [API v1](../../docs/API-V1.md)。不得将测试清理命令作用于用户部署的数据卷。
 
 行为变更按需覆盖：未授权读取、会话续期/撤销并发、配对码重用、重复事件、重复发件请求、领取/取消竞争、命令过期、数据库迁移和通知失败。外部短信与通知测试默认使用 mock，不产生真实发送副作用。仅当任务明确包含真实联调时使用指定测试环境。

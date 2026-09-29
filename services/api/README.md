@@ -126,3 +126,26 @@ docker compose -p simlink-debug stop
 ### 阅读状态（SQLite v5）
 
 按消息持久化共享阅读状态，历史消息明确迁移为未读；新增独立状态增量接口与比较版本写入，见 [API](../../docs/API-V1.md)。升级前按上述备份流程保存现有卷，新 Web 与后端同镜像部署；Android 无需同时更新。隔离验收后，2026-09-29已备份并更新 simlink-debug 持久实例；迁移与容器重启会话验证通过，见阅读状态验收记录。
+
+## 小内存服务器：预构建镜像 + 现有 Tunnel
+
+在开发机根据服务器架构构建（以下为 amd64），服务器只加载镜像，不安装编译依赖：
+
+```sh
+# 仓库根目录；使用本次实际版本替换 VERSION
+docker buildx build --platform linux/amd64 -f services/api/Dockerfile -t simlink-api:VERSION-amd64 --load .
+docker save simlink-api:VERSION-amd64 | gzip > simlink-image.tar.gz
+```
+
+把镜像归档及 `compose.prebuilt.yaml` 上传到指定部署目录，Compose文件可命名为 `compose.yaml`。服务器目录内创建权限600的 `.env`，设置 `SIMLINK_IMAGE=simlink-api:VERSION-amd64`、`PUBLIC_ORIGIN=https://实际域名` 和 `SIMLINK_PORT=8787`。然后执行：
+
+```sh
+docker load -i simlink-image.tar.gz
+docker compose -p simlink up -d --wait
+```
+
+运行配置仅绑定 `127.0.0.1:8787`、限制256MiB内存并轮转日志。现有Cloudflare Tunnel若使用host网络，其路由服务地址为 `http://127.0.0.1:8787`；公网主机名必须与PUBLIC_ORIGIN一致。浏览器端使用HTTPS与Secure Cookie，Tunnel至同机回环使用HTTP，无需打开8787公网端口或另建代理。不要为该站点配置“Cache Everything”来缓存私密API。
+
+SSH私钥只负责服务器登录，应用仍需按前文初始化独立管理员密码。默认新建独立持久卷，不自动迁移本机调试短信或手机绑定。更新镜像时保留同一项目名和卷，先备份；不要执行 `down -v`。公网HTTPS与登录最终验收需在域名路由生效后完成。
+
+若SSH上传完整镜像过慢，也可从本机目标架构镜像导出 `/app`（包含已编译原生依赖及生产Web），打包后上传；远程从相同digest的官方Node基础镜像仅执行ADD/COPY组装。此方式不会在服务器运行npm、apt或编译器。必须核对归档SHA-256、基础镜像架构/digest，并在最终容器验证SQLite启动、认证和健康检查。远程部署目录应保留此次实际Dockerfile与归档用于复现。

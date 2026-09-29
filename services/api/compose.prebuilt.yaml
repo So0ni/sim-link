@@ -1,0 +1,38 @@
+# Runtime-only deployment behind an existing host-network reverse proxy/tunnel.
+services:
+  api:
+    image: ${SIMLINK_IMAGE:?Set SIMLINK_IMAGE to the loaded image tag}
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN to the public HTTPS origin}
+      ALLOW_INSECURE_LOCAL: "0"
+      ALLOW_INSECURE_HTTP: "0"
+    ports:
+      - "127.0.0.1:${SIMLINK_PORT:-8787}:8787"
+    volumes:
+      - simlink-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 100
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    stop_grace_period: 15s
+volumes:
+  simlink-data:
