@@ -4,7 +4,7 @@
 
 ## 实现边界
 
-采用易自托管的单体服务与一种默认数据库；语言、框架和数据库尚未选定，按任务落实并记录，不从空目录推断已有技术栈。接口、迁移与可恢复持久状态优先，不无故引入中间件。
+采用 Node.js ESM、Fastify 和 better-sqlite3 / SQLite 单体服务；容器使用 Node.js 24，精确依赖见 package-lock.json。接口、迁移与可恢复持久状态优先，不无故引入中间件。PWA 已接入，Android 尚未上传；不能把服务端测试当成真机闭环完成。按 modules/auth、devices、inbox 划分业务，routes 不直接操作 SQL，service 拥有功能事务，platform 不反向依赖业务模块。详见 docs/ARCHITECTURE.md。
 
 ## 认证与数据
 
@@ -23,6 +23,6 @@
 
 ## 验证
 
-工程建立后将实际启动、迁移和测试命令记录在模块 README 并在此引用；现在没有可运行后端。
+本目录使用 `npm ci`、`npm test`、`npm start`；部署使用 `docker compose up -d --build --wait`；同一镜像托管 PWA，HTTPS 由主机已有代理负责，不在 Compose 提供代理或发布 80/443。`npm run test:compose` 使用独立项目和虚构数据验证容器重建持久化，结束仅删除自己的测试卷。初始化管理员、配置、迁移与备份见 [README](README.md)，接口语义见 [API v1](../../docs/API-V1.md)。不得将测试清理命令作用于用户部署的数据卷。
 
 行为变更按需覆盖：未授权读取、会话续期/撤销并发、配对码重用、重复事件、重复发件请求、领取/取消竞争、命令过期、数据库迁移和通知失败。外部短信与通知测试默认使用 mock，不产生真实发送副作用。仅当任务明确包含真实联调时使用指定测试环境。

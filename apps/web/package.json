@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/inbox.test.mjs"
+    "test": "node --experimental-strip-types --test tests/inbox.test.mjs tests/live.test.mjs",
+    "build:client": "vite build",
+    "dev:demo": "VITE_SIMLINK_DEMO=1 vite",
+    "build:demo": "VITE_SIMLINK_DEMO=1 vite build && node scripts/prepare-sites-build.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

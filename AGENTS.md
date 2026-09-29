@@ -12,12 +12,13 @@ SIMLink 是开源、自托管的远程 SIM 工具：Android 留守端收发短�
 - `apps/android/`：留守端。修改前读取 [Android 约定](apps/android/AGENTS.md)。
 - `design/`：设计资产、tokens、组件规格。修改前读取 [设计约定](design/AGENTS.md)。
 - `docs/`：产品范围和行为规格。
-- `apps/web/`：React + TypeScript PWA 交互原型。修改前读取 [Web 约定](apps/web/AGENTS.md)，运行命令见模块 README。
+- `apps/web/`：React + TypeScript PWA 与隔离的设计原型。修改前读取 [Web 约定](apps/web/AGENTS.md)，运行命令见模块 README。
 
 修改任何目录前检查路径上的子 AGENTS.md；从根目录启动也要主动读取相关模块约定。子文件只补充本模块差异，不复制根文件。新增目录只有存在独立规则时才增加子文件。
 
 ## 按任务读取上下文
 
+- 工程模块与依赖：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 - 范围、架构、阶段：[docs/PLAN.md](docs/PLAN.md)。区分已确认要求与建议默认值。
 - 页面、认证、同步、发件状态：[docs/UX.md](docs/UX.md) 中相关章节。
 - UI 工作：[design/README.md](design/README.md) 及涉及的组件、token、方向稿。
@@ -31,7 +32,7 @@ SIMLink 是开源、自托管的远程 SIM 工具：Android 留守端收发短�
 3. 更新所有受影响消费者，或记录明确的兼容/分阶段交付方式。代码同仓不意味着必须同时部署。
 4. 执行与变更相关的检查，更新有变化的规格与运行说明。
 
-契约后续有共享需求时可放 `packages/api-contract/`；该目录尚未创建，协议格式也未定。不为占位初始化工具链。客户端不直接导入后端内部实现，共享包不反向依赖应用实现。
+当前服务端接口契约见 `docs/API-V1.md`，Android/PWA 接入时按此核对语义。契约后续有生成客户端需求时可放 `packages/api-contract/`；该目录尚未创建。不为占位初始化工具链。客户端不直接导入后端内部实现，共享包不反向依赖应用实现。
 
 ## 不可混淆的产品语义
 
@@ -43,7 +44,7 @@ SIMLink 是开源、自托管的远程 SIM 工具：Android 留守端收发短�
 
 ## 验证与交付
 
-先查实际 manifest、构建文件、脚本和模块 README，再运行存在的命令。当前后端和 Android 尚未初始化，不编造测试/构建命令，也不为文档变更安装工程依赖。
+先查实际 manifest、构建文件、脚本和模块 README，再运行存在的命令。当前后端已有 P1 服务端基础，Android 已有 P0 工程、Web 已接入真实后端，Android 上传尚未接通，命令以各模块 README 为准。不编造测试/构建命令，也不为文档变更安装工程依赖。
 
 检查按影响选择：文档验证链接/一致性，tokens 验证格式/颜色组合，行为修改验证关键路径，契约变化验证消费者与兼容性。没有工具或真机时说明缺口；不把静态图、模拟器结果或成功编译描述为真实短信验证。
 

@@ -1,0 +1,20 @@
+{
+  "name": "@simlink/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "admin:init": "node src/admin.mjs",
+    "test": "node --test",
+    "test:compose": "node scripts/check-compose.mjs"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.5",
+    "better-sqlite3": "13.0.3",
+    "fastify": "5.12.5"
+  }
+}

@@ -1,31 +1,32 @@
 # SIMLink Web
 
-React + TypeScript 收件箱交互原型。白底蓝色与 SIM tabs，响应式桌面双栏和移动详情。
+React + TypeScript。默认入口已接入服务端持久登录、收件列表/详情及设备配对管理，保留白蓝配色、SIM 筛选和响应式双栏。结构见 [工程架构](../../docs/ARCHITECTURE.md)。
 
 ## 运行
 
-Node.js 22.16+（测试使用内置 TypeScript 类型剥离）。在本目录运行：
+Node.js 22.16+。在本目录：
 
 ```sh
 npm ci
-npm run dev -- --host 127.0.0.1 --port 5173
 npm run typecheck
-npm run build
 npm test
+npm run build
+npm run test:sites
 ```
 
-预览 http://127.0.0.1:5173/ 。首次点击“进入演示收件箱”；之后此浏览器恢复演示会话。退出位于设置。生产认证不能使用这一机制。
+推荐通过 [后端 Compose](../../services/api/README.md) 同源部署。开发热更新时，先在 services/api 按 README 初始化管理员，再用 `PUBLIC_ORIGIN=http://127.0.0.1:5173 ALLOW_INSECURE_LOCAL=1 npm start` 启动后端；前端 `npm run dev -- --host 127.0.0.1 --port 5173`。Vite 将 /api 和 /.well-known 转发至 127.0.0.1:8787，PUBLIC_ORIGIN 必须与浏览器访问地址一致。
 
-## 可交互范围
+## 当前真实能力
 
-- 全部 / 国内卡 / 工作卡、全部 / 未读筛选，进入详情才标记已读。
-- 验证码复制、完整原文、普通会话回复；按会话隔离的内存草稿。
-- 新建短信明确选卡、国际号码校验；模拟正在发送、已发送、结果未确认。
-- 原型演示面板模拟 Android 离线、服务器断连和未知发送结果；刷新未知状态不创建短信，重发需确认。
-- 设备/设置为辅助页面；通知配置、配对向导不在本次可交互范围。
+- 管理员密码登录，默认持久会话；启动/回前台恢复，断网不退出；退出撤销服务端会话。
+- 收件增量拉取、按设备/订阅/发件人分组、SIM 筛选、完整正文和复制；可见页面每 15 秒刷新。
+- 已配对设备列表、一次性配对凭证、撤销设备；尚不显示设备在线保证。
+- 短信只存在页面内存，无 localStorage 短信缓存；私密 API 始终鉴权。
 
-## 边界
+Android 上传尚未接通；本轮浏览器 QA 用虚构消息通过实际 API 入库。尚无跨端已读、远程发件、自动验证码提取、通知、Service Worker 或完整安装离线能力，iOS 主屏幕持久登录仍待真机验证。
 
-所有短信/号码/状态均为虚构，无任何真实发送请求。仅演示登录标记写入 localStorage；短信、已读、草稿、开关在内存中，刷新重置。没有生产密码登录、服务端会话、Service Worker 或安装离线能力。iOS 主屏幕持久登录、安全区和软键盘仍需后续真机验证。
+## 隔离的设计原型
 
-颜色与字体直接读取仓库 design/tokens/tokens.json；尺寸参照组件规范。QA 证据见 design-qa.md 与 qa/。构建保留模板的 Sites 兼容产物，但未部署。
+`npm run dev:demo` 或 `npm run build:demo` 显式构建演示版；src/demo 内有原有虚构短信、模拟发送、离线开关和 localStorage 演示会话。默认生产构建不包含这些模块，不能将演示产物部署成真实服务入口。
+
+`build:client` 仅生成 dist/client，供 Docker 同源托管；`build` 保留模板 Sites 打包兼容产物。没有执行发布。视觉 tokens 来自 design/tokens/tokens.json；本轮 QA 见 design-qa.md。

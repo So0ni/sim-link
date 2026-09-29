@@ -1,0 +1,31 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: services/api/Dockerfile
+    image: simlink-api:local
+    restart: unless-stopped
+    init: true
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env}
+      ALLOW_INSECURE_LOCAL: ${ALLOW_INSECURE_LOCAL:-0}
+    ports:
+      - "127.0.0.1:${SIMLINK_PORT:-8787}:8787"
+    volumes:
+      - simlink-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    stop_grace_period: 15s
+volumes:
+  simlink-data:

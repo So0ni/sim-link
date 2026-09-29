@@ -1,0 +1,67 @@
+.live-form {
+  display: grid;
+  gap: 12px;
+}
+.live-form input,
+.live-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--borderControl);
+  border-radius: 10px;
+  background: var(--background);
+  color: var(--textPrimary);
+}
+.live-form textarea {
+  resize: vertical;
+  min-height: 90px;
+  overflow-wrap: anywhere;
+}
+.live-page {
+  padding: 40px;
+  overflow-y: auto;
+}
+.live-card {
+  max-width: 720px;
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid var(--borderControl);
+  border-radius: 16px;
+  display: grid;
+  gap: 16px;
+}
+.live-device {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--borderControl);
+  padding-top: 16px;
+}
+.live-error {
+  color: var(--dangerText);
+  padding: 12px 0;
+}
+.live-tabs {
+  overflow-x: auto;
+}
+.live-tabs button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.live-tabs button[aria-pressed="true"] {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  border-radius: 0;
+}
+.bubble {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 799px) {
+  .live-page {
+    padding: 24px 20px 100px;
+  }
+  .live-card {
+    padding: 20px;
+  }
+}

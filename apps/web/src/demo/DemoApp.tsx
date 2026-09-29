@@ -20,7 +20,7 @@ import {
   SlidersHorizontal,
   ChatCircleDots,
 } from "@phosphor-icons/react";
-import tokens from "../../../design/tokens/tokens.json";
+import tokens from "../../../../design/tokens/tokens.json";
 import {
   initialConversations,
   sims,
@@ -112,7 +112,7 @@ function SimTabs({
     </div>
   );
 }
-export function App() {
+export function DemoApp() {
   const [route, go] = useRoute();
   const [authenticated, setAuthenticated] = useState(storedSession);
   const [restoring, setRestoring] = useState(true);

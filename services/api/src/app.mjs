@@ -1,0 +1,70 @@
+import Fastify from "fastify";
+import { resolve, join } from "node:path";
+import { accessSync } from "node:fs";
+import { openStore } from "./platform/store.mjs";
+import { configureHttp } from "./platform/http.mjs";
+import { createRateLimit } from "./platform/rate-limit.mjs";
+import { createAuthService } from "./modules/auth/service.mjs";
+import { createSessionPolicy } from "./modules/auth/http-policy.mjs";
+import { registerAuthRoutes } from "./modules/auth/routes.mjs";
+import { createDeviceService } from "./modules/devices/service.mjs";
+import { registerDeviceRoutes } from "./modules/devices/routes.mjs";
+import { createInboxService } from "./modules/inbox/service.mjs";
+import { registerInboxRoutes } from "./modules/inbox/routes.mjs";
+
+// Composition root: lifecycle and wiring only. Business modules do not import this file.
+export function createApp({
+  database = ":memory:",
+  origin = "https://localhost",
+  insecureLocal = false,
+  webRoot,
+  now = Date.now,
+} = {}) {
+  const url = new URL(origin);
+  if (url.origin !== origin || url.username || url.password)
+    throw new Error("PUBLIC_ORIGIN must be an origin without a trailing slash");
+  if (
+    url.protocol !== "https:" &&
+    !(
+      insecureLocal &&
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+    )
+  ) {
+    throw new Error("HTTPS is required except explicit loopback development");
+  }
+  const staticRoot = webRoot ? resolve(webRoot) : null;
+  if (staticRoot) accessSync(join(staticRoot, "index.html"));
+  const db = openStore(database);
+  const app = Fastify({
+    logger: false,
+    bodyLimit: 128 * 1024,
+    trustProxy: false,
+    ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
+  });
+  app.decorate("store", db);
+  app.addHook("onClose", async () => db.close());
+  configureHttp(app, staticRoot);
+  const auth = createAuthService(db, now);
+  const dependencies = {
+    auth,
+    sessions: createSessionPolicy(auth, origin),
+    rate: createRateLimit(db, now),
+    devices: createDeviceService(db, now, origin),
+    inbox: createInboxService(db, now),
+  };
+  registerAuthRoutes(app, dependencies);
+  registerDeviceRoutes(app, dependencies);
+  registerInboxRoutes(app, dependencies);
+  app.get("/healthz", async () => {
+    db.prepare("SELECT 1").get();
+    return { status: "ok" };
+  });
+  app.get("/.well-known/sim-gateway", async () => ({
+    name: "SIMLink",
+    apiVersion: 1,
+    serverVersion: "0.1.0",
+    capabilities: ["sms.receive"],
+  }));
+  return app;
+}
