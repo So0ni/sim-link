@@ -181,7 +181,8 @@ test('v1 migration removes revoked devices without losing SMS IDs or active cred
   t.after(() => rmSync(folder,{recursive:true,force:true}));
   const path = join(folder,'old.sqlite');
   const db = new Database(path);
-  db.exec(`CREATE TABLE devices(id TEXT PRIMARY KEY,name TEXT,token_hash TEXT,created_at INTEGER,revoked_at INTEGER);
+  db.exec(`CREATE TABLE pairings(hash TEXT PRIMARY KEY,expires_at INTEGER);
+    CREATE TABLE devices(id TEXT PRIMARY KEY,name TEXT,token_hash TEXT,created_at INTEGER,revoked_at INTEGER);
     CREATE TABLE messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT REFERENCES devices(id),event_id TEXT,sender TEXT,body TEXT,subscription_id INTEGER,received_at INTEGER,synced_at INTEGER,UNIQUE(device_id,event_id));
     INSERT INTO devices VALUES('old','Old','hash-old',1,2),('live','Live','hash-live',1,NULL);
     INSERT INTO messages VALUES(7,'old','event','Example','Fictional',1,1,2);
@@ -189,7 +190,7 @@ test('v1 migration removes revoked devices without losing SMS IDs or active cred
   db.close();
   const migrated = openStore(path);
   try {
-    assert.equal(migrated.pragma('user_version',{simple:true}),3);
+    assert.equal(migrated.pragma('user_version',{simple:true}),4);
     assert.deepEqual(migrated.prepare('SELECT id,token_hash,last_seen_at FROM devices').all(),[{id:'live',token_hash:'hash-live',last_seen_at:null}]);
     assert.equal(migrated.prepare('SELECT device_id FROM messages WHERE sequence=7').get().device_id,'old');
     assert.deepEqual(migrated.pragma('foreign_key_check'),[]);
@@ -237,4 +238,54 @@ test('SIM inventory keeps names/numbers, rejects reused mappings, and preserves 
   assert.equal((await list())[0].name, 'Backup');
   assert.equal((await app.inject({ url: '/api/v1/messages', headers })).json().messages[0].simKey, key);
   assert.equal((await report({ status: 'available', sims: [sim] })).statusCode, 401);
+});
+
+test('installation claims require an existing credential; recovery needs a targeted admin invitation and rotates credentials', async t => {
+  const { app, headers } = await fixture(t);
+  const old = await pair(app, headers);
+  const installationId = '00000000-0000-4000-8000-000000000011';
+  const auth = { authorization: `Bearer ${old.deviceToken}` };
+  const identity = { method:'POST', url:'/api/v1/device/identity', headers:auth, payload:{installationId,deviceId:old.deviceId} };
+  assert.equal((await app.inject({...identity,headers:{}})).statusCode,401);
+  assert.equal((await app.inject({...identity,payload:{...identity.payload,deviceId:'wrong'}})).statusCode,409);
+  const claimed = await app.inject(identity);
+  assert.equal(claimed.statusCode,200);
+  assert.equal(claimed.json().deviceId,old.deviceId);
+  const serverId = claimed.json().serverId;
+  assert.equal((await app.inject({...identity,payload:{...identity.payload,serverId}})).statusCode,200);
+  assert.equal((await app.inject({...identity,payload:{...identity.payload,serverId:'00000000-0000-4000-8000-000000000099'}})).statusCode,409);
+  assert.equal((await app.inject({...identity,payload:{...identity.payload,installationId:'00000000-0000-4000-8000-000000000012'}})).statusCode,409);
+  await app.inject({method:'POST',url:'/api/v1/device/messages',headers:auth,payload:event});
+  await app.inject({method:'POST',url:'/api/v1/device/sims',headers:auth,payload:{status:'available',sims:[{key:'00000000-0000-4000-8000-000000000033',subscriptionId:1,slotIndex:0,carrier:'Test'}]}});
+  const simId = (await app.inject({url:'/api/v1/sims',headers})).json().sims[0].id;
+  await app.inject({method:'PATCH',url:`/api/v1/sims/${simId}`,headers,payload:{name:'Backup',phoneNumber:'+12025550100'}});
+  const generic = (await app.inject({method:'POST',url:'/api/v1/pairings',headers})).json();
+  const pairing = {method:'POST',url:'/api/v1/device/pair',payload:{pairingToken:generic.pairingToken,name:'Different label',apiVersion:1,installationId}};
+  assert.equal((await app.inject(pairing)).statusCode,409);
+  const recoveryRequest = {method:'POST',url:`/api/v1/devices/${old.deviceId}/pairing`,headers};
+  assert.equal((await app.inject({...recoveryRequest,headers:{origin,cookie:headers.cookie}})).statusCode,403);
+  const invite = (await app.inject(recoveryRequest)).json();
+  const recover = {...pairing,payload:{...pairing.payload,pairingToken:invite.pairingToken}};
+  assert.equal((await app.inject({...recover,payload:{...recover.payload,installationId:'00000000-0000-4000-8000-000000000012'}})).statusCode,409);
+  const result = await app.inject(recover);
+  assert.equal(result.statusCode,200);
+  assert.equal(result.json().deviceId,old.deviceId);
+  assert.equal(result.json().serverId,serverId);
+  assert.notEqual(result.json().deviceToken,old.deviceToken);
+  assert.equal((await app.inject(identity)).statusCode,401);
+  assert.equal((await app.inject(recover)).statusCode,400);
+  const active = (await app.inject({url:'/api/v1/devices',headers})).json().devices;
+  assert.equal(active.length,1);
+  assert.equal(active[0].name,'Test gateway');
+  assert.equal((await app.inject({url:'/api/v1/sims',headers})).json().sims[0].phoneNumber,'+12025550100');
+  assert.equal((await app.inject({url:'/api/v1/messages',headers})).json().messages[0].deviceId,old.deviceId);
+  // Unpair removes active credentials but retains a separately recoverable installation identity.
+  await app.inject({method:'DELETE',url:`/api/v1/devices/${old.deviceId}`,headers});
+  assert.deepEqual((await app.inject({url:'/api/v1/devices',headers})).json().devices,[]);
+  assert.equal((await app.inject({url:'/api/v1/devices/recoverable',headers})).json().devices[0].id,old.deviceId);
+  const retiredInvite = (await app.inject(recoveryRequest)).json();
+  const restored = await app.inject({...recover,payload:{...recover.payload,pairingToken:retiredInvite.pairingToken}});
+  assert.equal(restored.statusCode,200);
+  assert.equal(restored.json().deviceId,old.deviceId);
+  assert.deepEqual((await app.inject({url:'/api/v1/devices/recoverable',headers})).json().devices,[]);
 });

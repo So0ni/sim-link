@@ -62,7 +62,7 @@ class ConnectionActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (busy) Toast.makeText(this@ConnectionActivity,"正在处理，请稍候",Toast.LENGTH_SHORT).show()
-                else when(route) { "manual", "review" -> chooser(); "chooser" -> if (connection != null) load() else finish(); else -> finish() }
+                else when(route) { "manual", "review" -> chooser(); "address" -> load(); "chooser" -> if (connection != null) load() else finish(); else -> finish() }
             }
         })
         startPage("服务器与同步", "正在读取本机连接状态…")
@@ -111,7 +111,7 @@ class ConnectionActivity : ComponentActivity() {
             scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描 SIMLink Web 设备页的配对二维码").setBeepEnabled(false).setBarcodeImageEnabled(false))
         }
         action("手动输入连接信息") { manual() }
-        content.addView(style.label("仅上传配对后新收到的短信。手机历史记录与原配对队列不会迁移。",14f,style.muted))
+        content.addView(style.label("恢复已验证的同一设备时保留待同步队列；连接其他后端时旧队列留在本机，不自动迁移。",14f,style.muted))
         action(if (connection == null) "暂不连接" else "保留当前连接") { finish() }
     }
     private fun manual() {
@@ -140,7 +140,7 @@ class ConnectionActivity : ComponentActivity() {
             val panel = style.panel()
             panel.addView(style.label(origin,20f,bold=true))
             panel.addView(style.label(if (insecure) "内网 HTTP 调试 · 传输未加密" else "HTTPS · 系统证书验证通过",14f,style.muted))
-            panel.addView(style.label("仅后续新短信上传到此服务器；历史记录与原配对队列保留在本机。",14f,style.muted))
+            panel.addView(style.label("恢复已验证的同一设备可继续同步原队列；连接其他后端仅同步后续新短信。",14f,style.muted))
             content.addView(panel)
             val name = field(content,"设备名称",deviceName)
             action("连接并返回运行页",true) {
@@ -154,9 +154,9 @@ class ConnectionActivity : ComponentActivity() {
     }
     private fun completePairing(origin: String, token: String, name: String, insecure: Boolean) {
         work("正在配对并保存设备凭证…", {
-            val result = GatewayApi(origin,cancellation!!,insecure).pair(token,name)
+            val result = GatewayApi(origin,cancellation!!,insecure).pair(token,name,InstallationStore(applicationContext).id)
             // Successful pairing is not reported until durable credential storage succeeds.
-            ConnectionStore(applicationContext).save(origin,result.first,result.second)
+            ConnectionStore(applicationContext).save(origin,result.deviceId,result.token,result.serverId)
             runCatching { SyncScheduler.schedule(applicationContext) }.getOrDefault(false)
         }) { scheduled ->
             val notice = if (scheduled) "配对成功，等待新短信" else "配对成功；系统暂未接受同步调度，请稍后重试"
@@ -164,6 +164,28 @@ class ConnectionActivity : ComponentActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP).putExtra("connection_notice",notice))
             finish()
         }
+    }
+    private fun address(current: Connection) {
+        route = "address"
+        startPage("修改服务器地址", "仅用于同一后端更换 IP 或域名；验证成功后保留设备、SIM 设置和待同步队列。")
+        val server = field(content,"新服务器地址",current.server).apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
+        val http = CheckBox(this).apply { text = "允许内网 HTTP 调试（连接未加密）"; visibility = if (BuildConfig.DEBUG) View.VISIBLE else View.GONE }
+        content.addView(http); actions.add(http)
+        action("验证并保存",true) {
+            val origin = try { serverOrigin(server.text.toString(), BuildConfig.DEBUG && http.isChecked) }
+            catch (_: Exception) { server.error = "请输入有效地址；内网 HTTP 需明确允许"; return@action }
+            AlertDialog.Builder(this).setTitle("确认这仍是你的服务器？")
+                .setMessage("$origin\n\n将向此地址提交现有设备凭证进行验证。确认是同一后端后继续；验证失败会保留原连接。")
+                .setNegativeButton("取消",null).setPositiveButton("验证地址") { _, _ ->
+                    work("正在验证原设备身份…", {
+                        val identity = GatewayApi(origin,cancellation!!,BuildConfig.DEBUG && http.isChecked)
+                            .identity(current.token(),current.deviceId,InstallationStore(applicationContext).id,current.serverId)
+                        ConnectionStore(applicationContext).relocate(current,origin,identity)
+                        runCatching { SyncScheduler.schedule(applicationContext) }
+                    }) { load() }
+                }.show()
+        }
+        action("取消") { load() }
     }
     private fun dashboard(current: Connection, summary: String) {
         route = "dashboard"
@@ -178,6 +200,7 @@ class ConnectionActivity : ComponentActivity() {
         action("请求同步",true) { work("正在请求系统调度…", { SyncScheduler.schedule(applicationContext) }) { accepted ->
             status.text = if (accepted) "已请求同步，请稍后刷新状态。" else "系统暂未接受调度，请稍后重试。"; status.visibility = View.VISIBLE
         } }
+        action("修改服务器地址（保留配对）") { address(current) }
         action("刷新状态") { load() }
         action("更多连接选项") {
             AlertDialog.Builder(this).setTitle("连接选项").setItems(arrayOf("重试需处理的事件","更换服务器 / 重新配对","解除配对")) { _, index -> when(index) {
@@ -206,7 +229,7 @@ class ConnectionActivity : ComponentActivity() {
                 if (!isDestroyed && !isFinishing) {
                     busy = false; actions.forEach { it.isEnabled = true }; progress.visibility = View.GONE
                     result.fold(success) { error -> showError(when(error) {
-                        is ApiFailure -> when(error.status) { 400 -> "配对码已使用、无效或过期。请返回并在 Web 重新生成。"; 429 -> "请求较多，请一分钟后重试。"; else -> "服务器请求失败（HTTP ${error.status}），请重试。" }
+                        is ApiFailure -> when(error.status) { 400 -> "配对码已使用、无效或过期。请返回并在 Web 重新生成。"; 409 -> "设备已存在或身份不匹配。请在 Web 为原设备生成恢复绑定二维码；不要创建新设备。"; 401 -> "原设备凭证已失效，请在 Web 为原设备生成恢复绑定二维码。"; 429 -> "请求较多，请一分钟后重试。"; else -> "服务器请求失败（HTTP ${error.status}），请重试。" }
                         else -> "操作未完成，请检查地址、网络、证书和本机存储。若配对请求已发出，请在 Web 检查设备；响应丢失时需撤销遗留设备并生成新码。"
                     }) }
                 }

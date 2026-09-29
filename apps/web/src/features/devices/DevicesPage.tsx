@@ -6,6 +6,8 @@ import { pairingPayload } from "./pairing.ts";
 import { errorText, type ApiClient } from "../../shared/api/client.ts";
 import {
   listDevices,
+  createRecoveryPairing,
+  listRecoverableDevices,
   createPairing,
   revokeDevice,
   type Device,
@@ -13,6 +15,8 @@ import {
 } from "./api.ts";
 export function DevicesPage({ api }: { api: ApiClient }) {
   const [sims, setSims] = useState<Sim[]>([]);
+  const [recoverable, setRecoverable] = useState<Pick<Device, "id" | "name">[]>([]);
+  const [pairingTarget, setPairingTarget] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [error, setError] = useState("");
@@ -22,11 +26,12 @@ export function DevicesPage({ api }: { api: ApiClient }) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    Promise.all([listDevices(api, controller.signal), listSims(api, controller.signal)])
-      .then(([result, inventory]) => {
+    Promise.all([listDevices(api, controller.signal), listSims(api, controller.signal), listRecoverableDevices(api, controller.signal)])
+      .then(([result, inventory, retired]) => {
         if (!controller.signal.aborted) {
           setDevices(result.devices);
           setSims(inventory.sims);
+          setRecoverable(retired.devices);
           setError("");
         }
       })
@@ -52,6 +57,13 @@ export function DevicesPage({ api }: { api: ApiClient }) {
     );
     return () => clearTimeout(timer);
   }, [pairing]);
+  async function recover(device: Pick<Device, "id" | "name">) {
+    if (!window.confirm(`为“${device.name}”恢复绑定？请仅让原安装扫描。配对成功后将替换旧凭证，保留设备、SIM 名称和短信记录。`)) return;
+    setBusy(true); setError(""); setPairing(null);
+    try { setPairing(await createRecoveryPairing(api, device.id)); setPairingTarget(device.name); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    catch (err) { setError(errorText(err)); }
+    finally { setBusy(false); }
+  }
   return (
     <main className="main live-page">
       <div className="title-row">
@@ -74,6 +86,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
             setBusy(true);
             setError("");
             try {
+              setPairingTarget("");
               setPairing(await createPairing(api));
             } catch (err) {
               setError(errorText(err));
@@ -86,6 +99,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
         </button>
         {pairing && (
           <div className="live-form">
+            {pairingTarget && <p role="status">恢复绑定：{pairingTarget} · 扫描成功后旧凭证失效</p>}
             <div className="pairing-qr" role="img" aria-label="一次性设备配对二维码">
               <QRCodeSVG value={pairingPayload(pairing)} size={256} level="M" marginSize={4} />
             </div>
@@ -119,6 +133,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
               </p>
               <p className="field-help">最近联系：{device.lastSeenAt == null ? "暂无记录" : new Date(device.lastSeenAt).toLocaleString()}</p>
               <p className="field-help">设备编号 {device.id.slice(0, 8)}</p>
+              <button disabled={busy} onClick={() => void recover(device)}>恢复绑定二维码</button>
               <p className="field-help">{device.inventoryStatus === "permission_required" ? "请在 Android 授权读取 SIM" : device.inventoryStatus === "unavailable" ? "暂时无法读取 SIM 清单" : device.inventoryStatus == null ? "等待网关上报 SIM 清单" : "SIM 清单已上报"}</p>
               {device.inventoryAt != null && <p className="field-help">清单更新于 {new Date(device.inventoryAt).toLocaleString()}</p>}
               {device.inventoryStatus === "available" && !sims.some(s => s.deviceId === device.id && s.state === "active") && <p className="field-help">未检测到在用 SIM。</p>}
@@ -151,6 +166,12 @@ export function DevicesPage({ api }: { api: ApiClient }) {
           </div>
         ))}
       </section>
+      {recoverable.length > 0 && <details className="live-card">
+        <summary>恢复已解除配对的设备</summary>
+        <p className="field-help">这些设备当前没有访问权限。仅保留安装身份与历史归属，恢复需要管理员生成专用二维码。</p>
+        {recoverable.map(device => <div className="live-device" key={device.id}><span>{device.name} · {device.id.slice(0, 8)}</span>
+          <button disabled={busy} onClick={() => void recover(device)}>恢复绑定二维码</button></div>)}
+      </details>}
       {error && (
         <p className="live-error" role="alert">
           {error}

@@ -73,7 +73,8 @@ export function createApp({
     name: "SIMLink",
     apiVersion: 1,
     serverVersion: "0.1.0",
-    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory"],
+    serverId: dependencies.devices.serverId,
+    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory", "device.identity"],
   }));
   return app;
 }

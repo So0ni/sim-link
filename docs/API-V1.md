@@ -110,3 +110,13 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 浏览器会话 `GET /api/v1/sims` 返回 `{sims:[{id,deviceId,simKey,subscriptionId,slotIndex,carrier,name,phoneNumber,state,reportedAt}]}`；state 为 active / inactive / unknown / detached，表示最后上报状态，不等于当前可发送。`PATCH /api/v1/sims/:id` 需 Origin/CSRF，body `{name,phoneNumber}`，备注 0–40 字符、号码输入 0–32 字符，规范化后可空或为可选 + 与 6–20 位数字。400 无效输入、404 记录不存在。号码不用于自动合并设备或历史数据。
 
 设备收件接口增加可选 `simKey`，与事件其他字段一同参与重试冲突检查；提供 simKey 时 subscriptionId 不得为 null。浏览器消息返回 simKey（旧记录为 null）。设备列表增加 inventoryStatus、inventoryAt（未上报为 null）。映射与升级边界见 [SIM-MAPPING.md](SIM-MAPPING.md)。
+
+## 安装身份与恢复（0.3.1-p1）
+
+能力 `device.identity`；well-known 增加持久 `serverId`。配对请求允许可选 installationId（36 字符小写 UUID），响应增加 serverId。旧客户端不带 installationId 的新设备配对仍兼容。
+
+- `POST /device/identity`：设备 Bearer；body `{installationId,deviceId,serverId?}`。deviceId 必须匹配凭证，已提供 serverId 必须匹配当前数据库。第一次通过有效旧凭证登记安装身份；响应 `{installationId,deviceId,serverId}`。错误凭证 401、身份冲突 409。重复同一登记幂等。
+- `POST /devices/:id/pairing`：管理员 Cookie、Origin/CSRF，生成绑定指定设备的五分钟单次恢复邀请，响应沿用配对二维码格式。只能针对已配对设备或已登记的可恢复安装；不存在返回 404。
+- `GET /devices/recoverable`：管理员会话；返回已解绑但保留安装身份的 `{devices:[{id,name}]}`，不包含有效凭证，不混入正常设备列表。
+
+已知 installationId 使用普通邀请码返回 409，必须由管理员生成指定恢复邀请；不同 installationId 不得消费原安装的恢复邀请。成功恢复保留 deviceId、名称、SIM 与短信，轮换 token 并使其他恢复邀请失效。明确解绑取消未消费的恢复邀请，但保留安装恢复索引。完整语义见 [设备身份](DEVICE-IDENTITY.md)。

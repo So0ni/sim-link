@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -10,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 3) {
+  if (version > 4) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -55,6 +56,15 @@ export function openStore(path) {
       ALTER TABLE messages ADD COLUMN sim_key TEXT;
       PRAGMA user_version=3;
     `);
+  })();
+  if (version < 4) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE server_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1),id TEXT NOT NULL);
+      CREATE TABLE installations (id TEXT PRIMARY KEY,device_id TEXT UNIQUE NOT NULL,name TEXT NOT NULL);
+      ALTER TABLE pairings ADD COLUMN target_device_id TEXT;
+      PRAGMA user_version=4;
+    `);
+    db.prepare("INSERT INTO server_identity VALUES(1,?)").run(randomUUID());
   })();
   return db;
 }

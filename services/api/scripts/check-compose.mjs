@@ -37,6 +37,8 @@ try {
   const device = (await request('/api/v1/device/pair', 'POST', { pairingToken: invitation.pairingToken, name: 'Compose smoke test', apiVersion: 1 }, {})).body;
   const event = { eventId: 'compose-fictional-1', sender: 'Example', body: 'Fictional compose test', subscriptionId: null, receivedAt: Date.now() };
   const deviceHeaders = { authorization: `Bearer ${device.deviceToken}` };
+  const installationId = '00000000-0000-4000-8000-000000000011';
+  const identity = (await request('/api/v1/device/identity', 'POST', { installationId, deviceId: device.deviceId }, deviceHeaders)).body;
   await request('/api/v1/device/heartbeat', 'POST', {}, deviceHeaders);
   assert.equal((await request('/api/v1/devices')).body.devices[0].presence, 'online');
   const mapping = { key: '00000000-0000-4000-8000-000000000001', subscriptionId: 1, slotIndex: 0, carrier: 'Test' };
@@ -46,6 +48,8 @@ try {
   await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   compose(['up', '-d', '--force-recreate', '--wait']);
   await request('/api/v1/auth/session');
+  assert.equal((await request('/.well-known/sim-gateway')).body.serverId, identity.serverId);
+  assert.equal((await request('/api/v1/device/identity', 'POST', { installationId, deviceId: device.deviceId, serverId: identity.serverId }, deviceHeaders)).body.deviceId, device.deviceId);
   assert.equal((await request('/api/v1/sims')).body.sims[0].phoneNumber, '+12025550100');
   const replay = await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   assert.equal(replay.body.duplicate, true);

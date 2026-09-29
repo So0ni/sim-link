@@ -44,6 +44,14 @@ class SyncRunner(private val context: Context) {
             } catch (error: ApiFailure) { throw UploadFailure(error.status) }
         }, { cancellation.stopped.get() }, { token ->
             try {
+                if (connection.serverId == null) {
+                    // Legacy bindings are claimed only by proving possession of their existing token.
+                    try {
+                        val serverId = api.identity(token,connection.deviceId,dev.simlink.gateway.connection.InstallationStore(context).id,null)
+                        connections.rememberIdentity(connection.generation,serverId)
+                    } catch (error: ApiFailure) { if (error.status != 404) throw error }
+                    catch (_: org.json.JSONException) { /* Older server without identity capability. */ }
+                }
                 api.heartbeat(token)
                 api.inventory(dev.simlink.gateway.telephony.SimInventory(context).refresh().json(), token)
                 inventorySupported = true

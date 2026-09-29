@@ -5,6 +5,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.net.HttpURLConnection
 
+class PairingResult(val deviceId: String, val token: String, val serverId: String)
 class ApiFailure(val status: Int) : Exception("HTTP $status")
 class Cancelled : Exception()
 class RequestCancellation {
@@ -46,14 +47,26 @@ class GatewayApi(private val server: String, private val cancellation: RequestCa
         val capabilities = result.getJSONArray("capabilities")
         check((0 until capabilities.length()).any { capabilities.getString(it) == "sms.receive" })
     }
-    fun pair(pairingToken: String, name: String): Pair<String, String> {
+    fun pair(pairingToken: String, name: String, installationId: String): PairingResult {
         require(Regex("[A-Za-z0-9_-]{43}").matches(pairingToken))
         require(name.isNotBlank() && name.length <= 80)
-        val result = request("/api/v1/device/pair", JSONObject().put("pairingToken", pairingToken).put("name", name).put("apiVersion", 1))
+        val result = request("/api/v1/device/pair", JSONObject().put("pairingToken", pairingToken).put("name", name).put("apiVersion", 1).put("installationId", installationId))
         check(result.getInt("apiVersion") == 1)
         val deviceId = result.getString("deviceId"); val deviceToken = result.getString("deviceToken")
         check(deviceId.isNotBlank() && Regex("[A-Za-z0-9_-]{43}").matches(deviceToken))
-        return deviceId to deviceToken
+        return PairingResult(deviceId, deviceToken, result.getString("serverId"))
+    }
+    fun identity(token: String, deviceId: String, installationId: String, expectedServerId: String?): String {
+        // Check the advertised server ID before transmitting credentials when a trusted ID is known.
+        val discovery = request("/.well-known/sim-gateway")
+        check(discovery.getInt("apiVersion") == 1 && discovery.getString("name") == "SIMLink")
+        val serverId = discovery.getString("serverId")
+        check(expectedServerId == null || expectedServerId == serverId)
+        val body = JSONObject().put("deviceId", deviceId).put("installationId", installationId)
+        expectedServerId?.let { body.put("serverId", it) }
+        val result = request("/api/v1/device/identity", body, token)
+        check(result.getString("deviceId") == deviceId && result.getString("serverId") == serverId && result.getString("installationId") == installationId)
+        return serverId
     }
     fun inventory(body: JSONObject, token: String) { check(request("/api/v1/device/sims", body, token).getBoolean("ok")) }
     fun heartbeat(token: String) { check(request("/api/v1/device/heartbeat", JSONObject(), token).getLong("receivedAt") >= 0) }

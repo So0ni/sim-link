@@ -22,3 +22,8 @@ export const createPairing = (api: ApiClient) =>
   api.request<Pairing>("/pairings", { method: "POST" });
 export const revokeDevice = (api: ApiClient, id: string) =>
   api.request(`/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+export const createRecoveryPairing = (api: ApiClient, id: string) =>
+  api.request<Pairing>(`/devices/${encodeURIComponent(id)}/pairing`, { method: "POST" });
+export const listRecoverableDevices = (api: ApiClient, signal?: AbortSignal) =>
+  api.request<{ devices: Pick<Device, "id" | "name">[] }>("/devices/recoverable", { signal });

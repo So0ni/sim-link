@@ -118,3 +118,7 @@ docker compose -p simlink-debug stop
 ### SIM 管理（SQLite v3）
 
 新设备清单接口、Web 备注名/电话号码编辑与消息 simKey 已接通。升级前备份数据卷，先更新本容器，再安装 Android 0.3.0-p1。旧 Android 收件兼容；历史短信不自动关联当前卡。详细规则见 [SIM 映射](../../docs/SIM-MAPPING.md)。
+
+### 设备身份（SQLite v4）
+
+数据库持久化 serverId 与安装恢复索引。变更 PUBLIC_ORIGIN 后，同一 Android 可验证旧凭证并修改地址；管理员可以为原设备生成专用恢复二维码。解绑仍移除有效设备，已登记安装另列在折叠的恢复列表，未授予访问权限。详见 [设备身份](../../docs/DEVICE-IDENTITY.md)。

@@ -28,4 +28,4 @@
 
 按 ui / connection / sync / telephony / data / platform 分包，详见 [同步架构](docs/P1-SYNC.md)。SyncEngine 必须可在 JVM 独立测试；UI/receiver 不直接执行上传，网络任务不得占用 LocalIo 收件执行器。保留根包旧组件名薄适配，避免升级破坏 launcher 与已有回执 PendingIntent。
 
-同一事务保存新收件和 outbox，事件绑定配对 generation，重新配对不迁移旧队列。仅匹配 ACK 后标记同步；上传重试不等于重发实体短信。Debug 可显式允许内网 HTTP，Release 仍为 HTTPS，禁止证书绕过。真机测试前先让用户确认服务器地址和上传范围。
+同一事务保存新收件和 outbox，事件绑定配对 generation。经过原凭证验证的地址迁移保留 generation；恢复绑定仅在已知 serverId 与 deviceId 均相同时保留旧队列，其他配对不得自动迁移。仅匹配 ACK 后标记同步；上传重试不等于重发实体短信。Debug 可显式允许内网 HTTP，Release 仍为 HTTPS，禁止证书绕过。真机测试前先让用户确认服务器地址和上传范围。
