@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -34,7 +35,7 @@ class GatewayStyle(private val context: Context) {
         text = value; textSize = 16f; isAllCaps = false; minHeight = dp(48)
         setPadding(dp(16),dp(12),dp(16),dp(12)); stateListAnimator = null
         setTextColor(ColorStateList(arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()), intArrayOf(muted, if (primary) Color.WHITE else if (destructive) danger else blue)))
-        background = RippleDrawable(ColorStateList.valueOf(0x220866E6), shape(if (primary) blue else Color.WHITE,12,if (primary) null else border),null)
+        background = RippleDrawable(ColorStateList.valueOf(0x220866E6), shape(if (primary) blue else Color.WHITE,12,if (primary) null else context.getColor(R.color.design_borderControl)),null)
         layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12); bottomMargin = dp(4) }
         setOnClickListener { block() }
     }
@@ -54,7 +55,7 @@ class GatewayStyle(private val context: Context) {
         addView(icon(resource),LinearLayout.LayoutParams(dp(24),dp(24)).apply { rightMargin = dp(16) })
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label(title,16f,bold=true)); if (detail.isNotEmpty()) addView(label(detail,14f,muted))
+            addView(label(title,16f,bold=true).apply { setPadding(0,0,0,0) }); if (detail.isNotEmpty()) addView(label(detail,14f,muted).apply { setPadding(0,dp(4),0,0) })
         },LinearLayout.LayoutParams(0,-2,1f))
         if (block != null) {
             addView(icon(R.drawable.ic_chevron_right),LinearLayout.LayoutParams(dp(24),dp(24)))
@@ -63,7 +64,10 @@ class GatewayStyle(private val context: Context) {
         }
     }
     fun decorateField(field: EditText) = field.apply {
-        background = shape(Color.WHITE,12,context.getColor(R.color.design_borderControl))
+        background = StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_focused),shape(Color.WHITE,12,blue).apply { setStroke(dp(2),blue) })
+            addState(intArrayOf(),shape(Color.WHITE,12,context.getColor(R.color.design_borderControl)))
+        }
         setPadding(dp(14),dp(12),dp(14),dp(12)); minHeight = dp(52)
         setTextColor(ink); setHintTextColor(muted)
         layoutParams = LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(16) }
@@ -73,7 +77,7 @@ class GatewayStyle(private val context: Context) {
         setPadding(dp(4),dp(8),dp(4),dp(8)); isFocusable = true; isSelected = active
         contentDescription = name; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         addView(icon(resource,if(active) blue else muted),LinearLayout.LayoutParams(dp(24),dp(24)))
-        addView(label(name,13f,if(active) blue else muted).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
+        addView(label(name,13f,if(active) blue else muted).apply { gravity = Gravity.CENTER; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
         background = RippleDrawable(ColorStateList.valueOf(selected),null,shape(Color.WHITE,0)); setOnClickListener { block() }
     }
 }

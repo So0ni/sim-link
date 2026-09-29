@@ -154,7 +154,18 @@ open class MainActivity : ComponentActivity() {
         renderedPage = page
         root.removeAllViews()
         val header = label("SIMLink Gateway", 16f, muted).apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
-        root.addView(header)
+        val subpage = page !in listOf("运行","短信","设置")
+        if (subpage) {
+            root.addView(LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL; setPadding(dp(8),dp(4),dp(20),dp(4))
+                addView(ImageButton(this@MainActivity).apply {
+                    setImageResource(R.drawable.ic_arrow_back); imageTintList = android.content.res.ColorStateList.valueOf(muted)
+                    contentDescription = "返回设置"; setBackgroundColor(Color.TRANSPARENT)
+                    setOnClickListener { navigate("设置") }
+                },LinearLayout.LayoutParams(dp(48),dp(48)))
+                addView(label("SIMLink Gateway",16f,muted))
+            })
+        } else root.addView(header)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), 0, dp(20), dp(24)) }
         scrollView = scroll
@@ -167,6 +178,7 @@ open class MainActivity : ComponentActivity() {
             "权限" -> setupPages().permissionsPage(); "后台" -> setupPages().backgroundPage(); "SIM" -> setupPages().simsPage()
             "诊断" -> diagnosticsPage(); else -> settingsPage()
         }
+        if (subpage) return
         root.addView(gatewayStyle.divider())
         val nav = LinearLayout(this).apply { gravity = Gravity.CENTER }
         listOf("运行" to R.drawable.ic_home, "短信" to R.drawable.ic_mail, "设置" to R.drawable.ic_settings).forEach { (name, icon) ->
@@ -175,13 +187,12 @@ open class MainActivity : ComponentActivity() {
         }
         root.addView(nav)
     }
-    private fun setupPages() = GatewaySetupPages(this,content,gatewayStyle) { navigate("设置") }
+    private fun setupPages() = GatewaySetupPages(this,content,gatewayStyle)
     private fun section(name: String) { content.addView(gatewayStyle.section(name)) }
     private fun row(icon: Int, title: String, detail: String, block: (() -> Unit)? = null) {
         content.addView(gatewayStyle.row(icon,title,detail,block)); content.addView(gatewayStyle.divider())
     }
     private fun connection() { startActivity(Intent(this, ConnectionActivity::class.java)) }
-    private fun back() { content.addView(action("返回设置") { navigate("设置") }) }
     private fun permissionRow(name: String, permission: String, explanation: String) {
         text("$name · ${if (granted(permission)) "已授予" else "未授予"}")
         text(explanation, true)
@@ -240,7 +251,7 @@ open class MainActivity : ComponentActivity() {
             box.addView(label("${DateFormat.getDateTimeInstance().format(Date(m.time))}\n${if (m.subId >= 0) "接收/发送时订阅 ${m.subId}" else "SIM 归属未知"}\n${m.status(System.currentTimeMillis())}", 13f, muted))
             content.addView(box)
         }
-        text("没有自动重发。结果未确认或部分成功时，请先核对收件方。", true)
+        if (records.any { it.outgoing }) text("没有自动重发。结果未确认或部分成功时，请先核对收件方。", true)
     }
     private fun composePage() {
         title("发送测试短信")
@@ -333,7 +344,6 @@ open class MainActivity : ComponentActivity() {
             section("开发调试")
             content.addView(action("本机测试发送") { navigate("发送") })
         }
-        back()
     }
     private fun openSettings() { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
     companion object { private val sendInProgress = AtomicBoolean(false) }

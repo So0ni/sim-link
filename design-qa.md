@@ -1,31 +1,47 @@
-# Android 原生设计收敛 · 2026-09-29
+# Android 原生设计验收 · 2026-09-29
 
-final result: blocked
+final result: passed
 
-## 证据与验收范围
+本结论仅覆盖本轮已实现且在模拟器实际打开的页面：未配对运行页、设置、权限配置、后台设置、SIM 概览、连接入口、手动连接、本地短信展示。不是全产品/真机联调验收，也不是与概念稿逐像素一致。
 
-- Source visual truth: `design/vision/android-gateway-status-white-blue.png`、`android-connect-server.png`、`android-sms-setup.png`、`android-background-setup.png`、`android-sim-setup.png`、`android-connection-recovery.png`。
-- 已打开视觉源图；运行状态源图 853 × 1844 像素。
-- Implementation: `apps/android/app/src/main/java/dev/simlink/gateway/ui/` 原生实现，0.3.2-p1。
-- Implementation screenshot / viewport / density normalization: 暂无。ADB 无设备，SDK 没有可用 AVD 或系统镜像。
-- Full-view / focused comparison: 尚未进行，不能用代码检查代替渲染对照。
+## 环境与证据
 
-## 当前实现与有意调整
+- Pixel 10a 模拟器，API 37.2，emulator-5554。使用 ADB 直接点击、滑动、读取 UI 树及截图。
+- 原始屏幕 1080×2424、420dpi，约411dp宽。另测试1080×2340、480dpi（360×780dp），1170×2532、480dpi（390×844dp）。字体缩放1.0与1.5；完成后恢复原始分辨率、密度和1.0字体。
+- 截图目录：[android-2026-09-29](design/qa/android-2026-09-29/)。仅包含模拟器状态与明确虚构的测试短信。
+- Source visual truth：`design/vision/android-gateway-status-white-blue.png`、`android-sms-setup.png`、`android-background-setup.png`、`android-connect-server.png`、`android-sim-setup.png`。
+- 全图组合对照：[comparison.png](design/qa/android-2026-09-29/comparison.png)。原图运行页853×1844；实现1080×2424，裁去顶部142px系统区域与底部63px手势区域，各自等比缩至390px宽；没有拉伸到同高。此处390px用于视觉密度归一，不能当成同设备同状态像素差分。
+- 状态区别：源图为已配对/双卡/向导，实现为未配对/未授权与独立设置页面。成功提示、默认短信角色、SIM开关和四步进度均未伪装实现。
+- 局部对照：[navigation-comparison.png](design/qa/android-2026-09-29/navigation-comparison.png)。两张同尺寸原始截图裁取相同导航区域再缩放。
 
-- 字体与层级：系统 sans，30sp 页标题、20sp 分组、16sp 正文、14sp 辅助信息；待真机核对换行。
-- 间距与布局：20dp 页面边距、16dp 状态卡圆角、12dp 控件圆角、至少48dp触控；待360/390dp、大字体、安全区验收。
-- 颜色：从共享 JSON 生成 Android color resources；白底、蓝色主操作、浅蓝选中面、语义警告。
-- 图标：官方 Material Symbols 矢量，保留 Apache 2.0 来源。无位图素材需求。
-- 文案：删除实验说明，未验证的在线/SIM可用状态不显示为成功；配对与同步配置分开表达。
-- 不复刻概念稿的错误语义：不申请默认短信角色，不添加无功能的 SIM 开关，不将厂商设置显示为自动验证完成。
+## 发现、修正与复核
 
-## 剩余验收
+1. **P2 导航文字靠左，与图标错位。** `running-before.png` 可见。为导航标签设置居中；`running-final.png`及局部组合图确认修复。
+2. **P2 配置子页仍显示底部导航与重复返回按钮。** `permissions.png` 可见。配置子页改为顶部返回、移除底部导航与冗余大按钮；`permissions-final.png`、`background-final.png`确认修复。系统返回键及顶部返回路径已实际检查。
+3. **P2 列表行额外内边距造成密度偏松。** 合并行内垂直间距；`comparison.png`展示修正后的层级与间距。状态卡未配对行动比源图成功摘要更高，属于状态内容差异。
+4. **P2 输入框缺少清楚的聚焦边框。** 改为2dp蓝色焦点描边；`manual-focus-390.png`、`manual-error-390.png`确认。非法地址保留输入并展示系统原生错误提示，没有发出配对请求。
+5. **P2 空收件箱/仅收件也出现重发警告。** 改为只在含发件记录时显示。`inbox-sample-390-final.png`确认收件视图不再显示无关警告。
 
-1. 连接 Android 设备，覆盖安装并核对运行、设置、权限、后台、SIM 页面。
-2. 用不含真实短信、号码或凭证的界面截图，与参考图同尺寸并排比较。
-3. 检查扫码/手动连接/失败恢复、键盘、返回手势、大字体与读屏标签。
-4. 修正视觉差异后重新截图；首次渲染对照未完成，不能签署 passed。
+## 五项视觉检查
 
-## 工程检查
+- 字体：系统sans与30/20/16/14/13sp层级；中文、英文正文与1.5倍字体可换行，未发现横向溢出。概念图中的粗细与本机系统字体差别可接受。
+- 布局：20dp边距、48dp以上操作目标、16dp卡片圆角；窄屏及大字体允许纵向滚动，不要求所有分组首屏展示。固定导航、顶部返回与系统安全区清楚分离。
+- 颜色：共享JSON生成的白蓝色板；控制边框采用borderControl，焦点蓝色；无渐变。未配对不显示成功绿勾。
+- 图标：官方Material Symbols矢量，无模糊位图或自绘替代。运行入口采用home符号与“运行”文字，为当前实现的明确差异。
+- 文案：权限和在线语义保持真实；概念稿默认短信角色改为实际接收权限，后台人工检查不显示自动完成。SIM命名与号码配置仍在Web，因此没有无效的开关或输入框。
 
-Debug 与 Release APK 构建、JVM 单元测试和 lintDebug 已通过；Lint 有现有依赖更新/资源等警告。无新的真实短信测试，不宣称已安装或通过视觉验收。
+## 实测交互
+
+- 运行、短信、设置互切；配置子页返回设置；手动连接返回扫码，再返回原页面。
+- 390dp手动表单：输入、键盘安全区、非法地址反馈；遮出屏幕的后续内容仍可滚动。
+- 360dp、1.5倍字体：运行页及权限页滚动到下方内容，返回入口保持可用；见`running-360-large*.png`与`permissions-360-large*.png`。
+- 模拟器授予接收短信/读取SIM权限；通过模拟器注入一条虚构短信，仅本地保存，正文完整。没有向真实号码发送短信，没有配对或上传至后端。
+- 最终Debug、Release构建、27项JVM测试、lintDebug通过；AndroidRuntime错误日志未见崩溃。Lint存在依赖/资源等非阻断警告。
+
+## 不在本次通过范围
+
+- 已配对在线/断线/恢复绑定的截图状态、相机实际扫码、失效二维码和服务端错误。
+- TalkBack完整朗读顺序、真实双卡、厂商权限弹窗、锁屏与后台行为。
+- SIM启用开关、端到端验证向导、最近联系状态等尚未实现的设计能力。
+
+这些仍需后续功能与联调验收，不能据本报告宣称完整设计稿或完整产品已实现。
