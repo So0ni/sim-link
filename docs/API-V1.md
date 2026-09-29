@@ -1,6 +1,6 @@
 # API v1 · 服务端首个可运行切片
 
-当前实现位于 `services/api`。同一服务托管 `/` Web 页面和静态资源；前端资源公开加载不赋予 API 权限，PWA 已接入持久登录、收件读取及配对管理。Android 已实现配对/上传代码但未真机联调，不能据此宣称真实短信端到端完成。默认传输为同源 HTTPS JSON；请求上限 128 KiB，JSON 字段严格校验。响应 `Cache-Control: no-store`。时间统一为 Unix 毫秒，所有错误为 `{ "error": "code" }`；401 表示身份失效、403 表示 Origin/CSRF 拒绝，网络错误不能被客户端解释为退出登录。
+当前实现位于 `services/api`。同一服务托管 `/` Web 页面和静态资源；前端资源公开加载不赋予 API 权限，PWA 已接入持久登录、收件读取及配对管理。Android 核心真实收件链路已有真机验证，具体版本和未覆盖场景见 P1-ACCEPTANCE.md。默认传输为同源 HTTPS JSON；请求上限 128 KiB，JSON 字段严格校验。响应 `Cache-Control: no-store`。时间统一为 Unix 毫秒，所有错误为 `{ "error": "code" }`；401 表示身份失效、403 表示 Origin/CSRF 拒绝，网络错误不能被客户端解释为退出登录。
 
 ## 登录与会话
 
