@@ -83,3 +83,11 @@ Debug APK 可勾选内网 HTTP 调试；Release 仍强制 HTTPS，普通证书�
 ### 安装身份与地址迁移（0.3.1-p1）
 
 本地数据库 v4 持久化 installationId 与已验证的 serverId。服务器与同步提供「修改服务器地址（保留配对）」；仅换 IP/域名使用此入口。Web 原设备的恢复二维码用于重新签发凭证；普通添加二维码不重复创建已知安装。队列保留条件及旧版本迁移见 [设备身份](../../docs/DEVICE-IDENTITY.md)。
+
+### Native UI tokens
+
+Android colors are generated from the shared design file. After changing colors,
+run `python3 apps/android/scripts/generate-tokens.py` from the repository root.
+`GatewayStyle` owns native components; `GatewaySetupPages` renders permission,
+SIM and background configuration without network or message-store access.
+Local test sending is accessible only in Debug via 设置 → 诊断与帮助 → 开发调试.

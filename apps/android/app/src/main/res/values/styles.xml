@@ -2,10 +2,10 @@
     <string name="app_name">SIMLink Gateway</string>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#0866E6</item>
+        <item name="android:colorAccent">@color/design_primary</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:windowBackground">@color/design_background</item>
     </style>
 </resources>

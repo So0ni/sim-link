@@ -1,12 +1,13 @@
 package dev.simlink.gateway.ui
 
+import dev.simlink.gateway.R
 import dev.simlink.gateway.BuildConfig
 import dev.simlink.gateway.data.*
 import dev.simlink.gateway.telephony.*
 
 import android.Manifest
-import android.app.Activity
-import android.app.AlertDialog
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -17,7 +18,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.provider.Telephony
+import android.os.PowerManager
+import android.os.BatteryManager
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
 import android.text.InputType
@@ -30,13 +32,15 @@ import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** Local gateway UI; connection and sync own networking and credentials. */
-open class MainActivity : Activity() {
+open class MainActivity : ComponentActivity() {
     private val gatewayStyle by lazy { GatewayStyle(this) }
     private val blue get() = gatewayStyle.blue
     private val ink get() = gatewayStyle.ink
     private val muted get() = gatewayStyle.muted
     private lateinit var root: LinearLayout
     private lateinit var content: LinearLayout
+    private var renderedPage = ""
+    private var scrollView: ScrollView? = null
     private var page = "运行"
     private var draftAddress = ""
     private var draftBody = ""
@@ -47,6 +51,9 @@ open class MainActivity : Activity() {
     private var records: List<LocalMessage> = emptyList()
     private var loadError: String? = null
     private var statusNotice: String? = null
+    private var paired = false
+    private var syncEnabled = false
+    private var serverAddress = "尚未连接"
     private var connectionOverview = "正在读取服务器状态…"
     private val refresh = object : Runnable {
         override fun run() { loadRecords(); handler.postDelayed(this, 2000) }
@@ -69,6 +76,12 @@ open class MainActivity : Activity() {
                 insets
             }
         }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (page !in listOf("运行", "短信", "设置")) navigate("设置")
+                else if (page != "运行") navigate("运行") else finish()
+            }
+        })
         setContentView(root)
         root.requestApplyInsets()
         draw()
@@ -94,18 +107,15 @@ open class MainActivity : Activity() {
         out.putInt("sub", selectedSub); out.putInt("slot", selectedSlot)
         super.onSaveInstanceState(out)
     }
-    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
         draw()
     }
     private fun granted(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
     private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
-    private fun label(text: String, size: Float = 16f, color: Int = ink) = TextView(this).apply {
-        this.text = text; textSize = size; setTextColor(color)
-        setPadding(0, dp(8), 0, dp(8)); setTextIsSelectable(true)
-    }
+    private fun label(text: String, size: Float = 16f, color: Int = ink) = gatewayStyle.label(text,size,color)
     private fun action(title: String, primary: Boolean = false, block: () -> Unit) = gatewayStyle.action(title,primary,block=block)
-    private fun title(text: String) { content.addView(label(text, 28f).apply { setTypeface(typeface, Typeface.BOLD) }) }
+    private fun title(text: String) { content.addView(label(text, 30f).apply { setTypeface(typeface, Typeface.BOLD) }) }
     private fun text(value: String, mutedText: Boolean = false) { content.addView(label(value, if (mutedText) 14f else 16f, if (mutedText) muted else ink)) }
     private fun navigate(next: String) { captureDraft(); page = next; draw() }
     private fun captureDraft() {
@@ -115,8 +125,10 @@ open class MainActivity : Activity() {
     private fun loadRecords() {
         LocalIo.executor.execute {
             val result = runCatching { MessageStore.get(this).recent() }
+            var currentConnection: dev.simlink.gateway.connection.Connection? = null
             val overview = runCatching {
                 val c = dev.simlink.gateway.connection.ConnectionStore(applicationContext).current()
+                currentConnection = c
                 if (c == null) "尚未配对 · 短信仅保存在本机" else
                     "${if (c.enabled) "已配对" else "同步已暂停"} · ${c.server}\n${dev.simlink.gateway.sync.SyncQueue(applicationContext).summary(c.generation)}\n${c.notice}"
             }.getOrDefault("无法读取连接状态，请检查本机存储")
@@ -124,10 +136,13 @@ open class MainActivity : Activity() {
                 if (isDestroyed || isFinishing) return@post
                 val connectionChanged = overview != connectionOverview
                 connectionOverview = overview
+                paired = currentConnection != null
+                syncEnabled = currentConnection?.enabled == true
+                serverAddress = currentConnection?.server ?: "尚未连接"
                 val changed = result.getOrNull() != records || (result.isFailure != (loadError != null))
                 records = result.getOrDefault(records)
                 loadError = if (result.isFailure) "无法读取本地记录，请检查手机存储空间。" else null
-                if (page == "运行" && connectionChanged) draw()
+                if (page in listOf("运行", "诊断") && connectionChanged) draw()
                 if (page == "短信" && (changed || records.any { it.outgoing && it.results.any { r -> r == null } })) draw()
             }
         }
@@ -135,25 +150,38 @@ open class MainActivity : Activity() {
     private fun draw() {
         if (!::root.isInitialized) return
         captureDraft()
+        val previousScroll = if (renderedPage == page) scrollView?.scrollY ?: 0 else 0
+        renderedPage = page
         root.removeAllViews()
-        val header = label("SIMLink Gateway", 18f).apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
+        val header = label("SIMLink Gateway", 16f, muted).apply { setPadding(dp(20), dp(12), dp(20), dp(8)) }
         root.addView(header)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), 0, dp(20), dp(24)) }
+        scrollView = scroll
         scroll.addView(content)
+        scroll.post { scroll.scrollTo(0, previousScroll) }
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        when (page) { "运行" -> statusPage(); "短信" -> messagesPage(); "发送" -> composePage(); else -> settingsPage() }
-        val nav = LinearLayout(this).apply { gravity = Gravity.CENTER; setPadding(dp(12), dp(4), dp(12), dp(4)) }
-        listOf("运行", "短信", "设置").forEach { name ->
-            nav.addView(Button(this).apply {
-                text = name; isAllCaps = false; minHeight = dp(48)
-                setTextColor(if (page == name || (name == "短信" && page == "发送")) blue else muted)
-                setBackgroundColor(Color.WHITE)
-                setOnClickListener { navigate(name) }
-            }, LinearLayout.LayoutParams(0, -2, 1f))
+        when (page) {
+            "运行" -> statusPage(); "短信" -> messagesPage()
+            "发送" -> if (BuildConfig.DEBUG) composePage() else settingsPage()
+            "权限" -> setupPages().permissionsPage(); "后台" -> setupPages().backgroundPage(); "SIM" -> setupPages().simsPage()
+            "诊断" -> diagnosticsPage(); else -> settingsPage()
+        }
+        root.addView(gatewayStyle.divider())
+        val nav = LinearLayout(this).apply { gravity = Gravity.CENTER }
+        listOf("运行" to R.drawable.ic_home, "短信" to R.drawable.ic_mail, "设置" to R.drawable.ic_settings).forEach { (name, icon) ->
+            val selected = if (page in listOf("运行","短信","设置")) page else "设置"
+            nav.addView(gatewayStyle.navigation(name,icon,selected == name) { navigate(name) },LinearLayout.LayoutParams(0,-2,1f))
         }
         root.addView(nav)
     }
+    private fun setupPages() = GatewaySetupPages(this,content,gatewayStyle) { navigate("设置") }
+    private fun section(name: String) { content.addView(gatewayStyle.section(name)) }
+    private fun row(icon: Int, title: String, detail: String, block: (() -> Unit)? = null) {
+        content.addView(gatewayStyle.row(icon,title,detail,block)); content.addView(gatewayStyle.divider())
+    }
+    private fun connection() { startActivity(Intent(this, ConnectionActivity::class.java)) }
+    private fun back() { content.addView(action("返回设置") { navigate("设置") }) }
     private fun permissionRow(name: String, permission: String, explanation: String) {
         text("$name · ${if (granted(permission)) "已授予" else "未授予"}")
         text(explanation, true)
@@ -165,43 +193,51 @@ open class MainActivity : Activity() {
 
     private fun statusPage() {
         title("运行状态")
-        val connectionPanel = gatewayStyle.panel()
-        connectionPanel.addView(gatewayStyle.label("服务器与同步",20f,bold=true))
-        connectionPanel.addView(gatewayStyle.label(connectionOverview,14f,muted))
-        content.addView(connectionPanel)
-        content.addView(action("服务器与同步", true) { startActivity(Intent(this, ConnectionActivity::class.java)) })
-        text("先授权接收和 SIM 读取，再从另一部手机发一条普通测试短信。这里只保存授权后收到的新短信。")
-        permissionRow("接收短信", Manifest.permission.RECEIVE_SMS, "先在本机保存新短信；配对后新收到的短信会上传至你确认的服务器。")
-        permissionRow("读取 SIM", Manifest.permission.READ_PHONE_STATE, "识别当前可用的卡槽与订阅，发送时由你明确选卡。")
-        content.addView(action("打开应用系统设置") { openSettings() })
-        text("若系统不允许授权，请在系统设置检查；权限成功也不代表已经实测收件。", true)
-        text("SIM 卡", false)
+        val needsPermission = !granted(Manifest.permission.RECEIVE_SMS) || !granted(Manifest.permission.READ_PHONE_STATE)
+        val panel = gatewayStyle.panel(if (paired && !syncEnabled) gatewayStyle.warning else gatewayStyle.selected)
+        panel.addView(gatewayStyle.label(when {
+            !paired -> "连接你的服务器"
+            !syncEnabled -> "同步需要处理"
+            needsPermission -> "完成运行配置"
+            else -> "已配对，自动同步已启用"
+        },20f,bold=true))
+        panel.addView(label(when {
+            !paired -> "连接后，新收到的短信会同步到你的 SIMLink。"
+            !syncEnabled -> "短信仍保存在本机，请检查服务器连接。"
+            needsPermission -> "授予接收短信和读取 SIM 权限，让这部手机开始工作。"
+            else -> "新短信先保存在本机，再由系统安排同步。"
+        },14f,muted))
+        if (paired) panel.addView(label(connectionOverview.substringAfter('\n', ""),13f,muted))
+        panel.addView(action(if (!paired) "连接服务器" else if (needsPermission) "完成权限设置" else "查看同步状态", !paired || needsPermission) {
+            if (paired && needsPermission) navigate("权限") else connection()
+        })
+        content.addView(panel)
+        section("此设备")
+        row(R.drawable.ic_smartphone,"留守手机",Build.MODEL)
+        row(R.drawable.ic_dns,"服务器",serverAddress) { connection() }
+        val battery = getSystemService(BatteryManager::class.java).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        row(R.drawable.ic_battery_full,"电量",if (battery in 0..100) "$battery%" else "暂时无法读取")
+        section("SIM 卡")
         availableSims = readSims()
-        if (availableSims.isEmpty()) text("暂无可读取的 SIM。请先授权并检查手机中的 SIM。", true)
-        availableSims.forEach { text("卡槽 ${it.simSlotIndex + 1} · ${it.displayName}\n当前订阅 ${it.subscriptionId} · 号码未读取") }
-        text("默认短信应用：${Telephony.Sms.getDefaultSmsPackage(this) ?: "未知"}", true)
-        text("本实验不替换默认短信应用。验证码覆盖、双卡映射和后台稳定性仍待真机确认。", true)
-        content.addView(action("查看收到的短信", true) { navigate("短信") })
+        if (availableSims.isEmpty()) row(R.drawable.ic_sim_card,"尚未识别 SIM",if (granted(Manifest.permission.READ_PHONE_STATE)) "请检查手机中的 SIM 卡" else "需要读取 SIM 权限") { navigate("权限") }
+        availableSims.forEach { row(R.drawable.ic_sim_card,"SIM ${it.simSlotIndex + 1}",it.displayName.toString()) { navigate("SIM") } }
+        section("运行条件")
+        row(R.drawable.ic_verified_user,"短信与 SIM 权限",if (needsPermission) "需要设置" else "已授予") { navigate("权限") }
+        row(R.drawable.ic_battery_full,"后台运行",batterySummary()) { navigate("后台") }
     }
+    private fun batterySummary() = if (getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)) "系统电池优化已豁免" else "系统电池优化已启用"
     private fun messagesPage() {
         title("短信")
         text("本机最近 100 条 · 不读取系统历史短信", true)
         statusNotice?.let { text(it) }
         loadError?.let { text(it) }
-        content.addView(action("新建测试短信", true) { navigate("发送") })
-        if (records.isEmpty()) text("还没有本地记录。授权接收后，从另一部手机发送一条测试短信。")
+
+        if (records.isEmpty()) text("还没有短信。授权后收到的新短信会出现在这里。")
         records.forEach { m ->
-            val box = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(8), dp(14), dp(12))
-                setBackgroundColor(if (m.outgoing) Color.rgb(235, 243, 255) else Color.rgb(245, 247, 250))
-                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) }
-            }
+            val box = gatewayStyle.panel(if (m.outgoing) gatewayStyle.selected else gatewayStyle.subtle)
             box.addView(label("${if (m.outgoing) "发给" else "来自"} ${m.address}").apply { setTypeface(typeface, Typeface.BOLD) })
-            box.addView(label(m.body))
+            box.addView(label(m.body).apply { setTextIsSelectable(true) })
             box.addView(label("${DateFormat.getDateTimeInstance().format(Date(m.time))}\n${if (m.subId >= 0) "接收/发送时订阅 ${m.subId}" else "SIM 归属未知"}\n${m.status(System.currentTimeMillis())}", 13f, muted))
-            if (m.outgoing) {
-                box.addView(label(m.results.mapIndexed { i, r -> "分段 ${i + 1}：${when(r) { null -> "尚无回调"; -1 -> "系统报告已发送"; else -> "系统错误码 $r" }}" }.joinToString("\n"), 13f, muted))
-            }
             content.addView(box)
         }
         text("没有自动重发。结果未确认或部分成功时，请先核对收件方。", true)
@@ -227,12 +263,12 @@ open class MainActivity : Activity() {
         }
         content.addView(spinner)
         if (availableSims.isEmpty()) text("请先在运行页授予读取 SIM 权限，并检查 SIM。", true)
-        val address = EditText(this).apply {
+        val address = gatewayStyle.decorateField(EditText(this)).apply {
             tag = "address"; hint = "+65 8123 4567"; contentDescription = "收件号码（含国家区号）"
             inputType = InputType.TYPE_CLASS_PHONE; minHeight = dp(48); setText(draftAddress)
         }
         text("收件号码（含国家区号）"); content.addView(address)
-        val body = EditText(this).apply {
+        val body = gatewayStyle.decorateField(EditText(this)).apply {
             tag = "body"; hint = "输入测试短信"; contentDescription = "短信正文"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             minLines = 4; gravity = Gravity.TOP; setText(draftBody)
@@ -276,18 +312,28 @@ open class MainActivity : Activity() {
     }
     private fun settingsPage() {
         title("设置")
-        content.addView(action("服务器与同步", true) { startActivity(Intent(this, ConnectionActivity::class.java)) })
-        text("SIMLink Gateway · ${BuildConfig.VERSION_NAME}")
-        text("${Build.MANUFACTURER} ${Build.MODEL}\nAndroid ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}")
-        text("服务器：在“服务器与同步”中查看\n默认短信角色：本实验不申请\n自动重发短信：关闭且不可开启\n送达报告：本实验未请求", true)
-        text("本机数据保存在私有存储，备份已关闭；配对后新短信另有服务端副本。卸载或清除存储会删除本地记录，不删除服务端副本。", true)
-        text("重启后需先解锁。强行停止、厂商省电或权限撤销可能阻止收件；不承诺后台常驻。", true)
-        content.addView(action("打开应用系统设置") { openSettings() })
-        content.addView(action("查看验证步骤") {
-            AlertDialog.Builder(this).setTitle("真机验证")
-                .setMessage("1. 授予接收和 SIM 权限\n2. 测试普通短信与长短信\n3. 双卡逐张接收并核对订阅\n4. 手动选择 SIM 发送给测试号码\n5. 锁屏、重启解锁后重复收件\n6. 飞行模式测试发送失败\n\n请在验证表记录结果；不要提交真实号码和短信正文。")
-                .setPositiveButton("知道了", null).show()
-        })
+        section("网关")
+        row(R.drawable.ic_dns,"服务器与同步","连接、修改地址与解除配对") { connection() }
+        row(R.drawable.ic_sim_card,"SIM 卡","查看此设备中的卡片") { navigate("SIM") }
+        section("运行条件")
+        row(R.drawable.ic_verified_user,"短信与 SIM 权限","管理网关需要的访问权限") { navigate("权限") }
+        row(R.drawable.ic_battery_full,"后台运行","电池优化与厂商设置") { navigate("后台") }
+        section("关于")
+        row(R.drawable.ic_info,"诊断与帮助","查看设备信息与本机数据说明") { navigate("诊断") }
+        text("SIMLink Gateway · ${BuildConfig.VERSION_NAME}",true)
+    }
+    private fun diagnosticsPage() {
+        title("诊断与帮助")
+        row(R.drawable.ic_smartphone,"设备","${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}")
+        row(R.drawable.ic_sync,"同步",connectionOverview)
+        section("本机数据")
+        text("本机记录保存在应用私有存储中，备份已关闭。卸载或清除存储会删除本地记录，服务端副本不受影响。",true)
+        text("发送结果以系统回调为准，不自动重发实体短信。当前未请求送达报告。",true)
+        if (BuildConfig.DEBUG) {
+            section("开发调试")
+            content.addView(action("本机测试发送") { navigate("发送") })
+        }
+        back()
     }
     private fun openSettings() { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
     companion object { private val sendInProgress = AtomicBoolean(false) }

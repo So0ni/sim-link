@@ -55,7 +55,17 @@ class ConnectionActivity : ComponentActivity() {
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom); insets
             }
         }
-        root.addView(style.label("SIMLink Gateway", 18f).apply { setPadding(style.dp(20),style.dp(12),style.dp(20),style.dp(8)) })
+        root.addView(LinearLayout(this).apply {
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(style.dp(8),style.dp(4),style.dp(20),style.dp(4))
+            addView(ImageButton(this@ConnectionActivity).apply {
+                setImageResource(dev.simlink.gateway.R.drawable.ic_arrow_back)
+                imageTintList = android.content.res.ColorStateList.valueOf(style.muted)
+                contentDescription = "返回"; setBackgroundColor(Color.TRANSPARENT)
+                setOnClickListener { onBackPressedDispatcher.onBackPressed() }
+            },LinearLayout.LayoutParams(style.dp(48),style.dp(48)))
+            addView(style.label("SIMLink Gateway",16f,style.muted))
+        })
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(style.dp(20),0,style.dp(20),style.dp(24)) }
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(content) }, LinearLayout.LayoutParams(-1,0,1f))
         setContentView(root); root.requestApplyInsets()
@@ -70,7 +80,7 @@ class ConnectionActivity : ComponentActivity() {
     }
     private fun startPage(title: String, subtitle: String) {
         actions.clear(); content.removeAllViews()
-        content.addView(style.label(title,28f,bold=true))
+        content.addView(style.label(title,30f,bold=true))
         content.addView(style.label(subtitle,14f,style.muted))
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true; visibility = View.GONE }
         content.addView(progress, LinearLayout.LayoutParams(-1,style.dp(4)))
@@ -85,7 +95,7 @@ class ConnectionActivity : ComponentActivity() {
         parent.addView(style.label(title,14f,bold=true))
         return EditText(this).apply {
             setText(value); hint = hintText; contentDescription = title; textSize = 16f
-            setTextColor(style.ink); backgroundTintList = android.content.res.ColorStateList.valueOf(style.blue)
+            style.decorateField(this)
             isSingleLine = true; minHeight = style.dp(48); isSaveEnabled = false
             inputType = InputType.TYPE_CLASS_TEXT or if (secret) InputType.TYPE_TEXT_VARIATION_PASSWORD else InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
@@ -102,14 +112,11 @@ class ConnectionActivity : ComponentActivity() {
     }
     private fun chooser() {
         route = "chooser"
-        startPage(if (connection == null) "连接你的服务器" else "更换服务器", "用 SIMLink Web 的配对二维码连接这部留守手机。")
-        val panel = style.panel()
-        panel.addView(style.label("一次配对，持续连接",20f,bold=true))
-        panel.addView(style.label("配对成功后，应用会保存独立设备凭证。以后打开应用或同步短信，无需再次扫描。",14f,style.muted))
-        content.addView(panel)
+        startPage(if (connection == null) "连接服务器" else "更换服务器", "用 SIMLink Web 的配对二维码连接这部留守手机。")
         action("扫描配对二维码",true) {
             scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描 SIMLink Web 设备页的配对二维码").setBeepEnabled(false).setBarcodeImageEnabled(false))
         }
+        content.addView(style.label("或使用一次性配对码",14f,style.muted).apply { gravity = android.view.Gravity.CENTER; setPadding(0,style.dp(24),0,style.dp(8)) })
         action("手动输入连接信息") { manual() }
         content.addView(style.label("恢复已验证的同一设备时保留待同步队列；连接其他后端时旧队列留在本机，不自动迁移。",14f,style.muted))
         action(if (connection == null) "暂不连接" else "保留当前连接") { finish() }
