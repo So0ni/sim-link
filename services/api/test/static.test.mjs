@@ -11,6 +11,8 @@ test('same-origin UI serves index, assets and navigation without masking private
   writeFileSync(join(root, 'index.html'), '<html>SIMLink test shell</html>');
   writeFileSync(join(root, 'assets/app.js'), '/* fictional test asset */');
   writeFileSync(join(root, '.env'), 'fixture-only');
+  writeFileSync(join(root, 'sw.js'), '/* fictional service worker */');
+  writeFileSync(join(root, 'manifest.webmanifest'), '{"name":"SIMLink"}');
   const app = createApp({ webRoot: root });
   try {
     for (const url of ['/', '/messages/example']) {
@@ -21,6 +23,10 @@ test('same-origin UI serves index, assets and navigation without masking private
       assert.equal(r.headers['cache-control'], 'no-store');
     }
     assert.equal((await app.inject('/assets/app.js')).statusCode, 200);
+    const sw = await app.inject('/sw.js');
+    assert.match(sw.headers['content-type'], /javascript/);
+    assert.equal(sw.headers['cache-control'], 'no-store');
+    assert.equal((await app.inject('/manifest.webmanifest')).statusCode, 200);
     for (const url of ['/api/unknown', '/api', '/assets/missing.js', '/.env', '/.well-known/missing', '/missing.json']) {
       assert.notEqual((await app.inject({ url, headers: { accept: 'text/html' } })).statusCode, 200, url);
     }

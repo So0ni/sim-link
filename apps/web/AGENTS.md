@@ -6,3 +6,5 @@
 - 在本目录运行：`npm run dev -- --host 127.0.0.1`、`npm run build`、`npm run typecheck`、`npm test`。实际浏览器验证手机和桌面核心路径；原型交付前更新 design-qa.md。
 - 生产认证使用服务端 HttpOnly Cookie，CSRF 和短信仅存内存；不写入 localStorage。仅 demo 可持久化无敏感信息的演示标记。
 - 保留 .openai/hosting.json、worker/index.js、scripts/prepare-sites-build.mjs、tests/sites-worker.test.mjs 的模板部署兼容能力；未经用户要求不发布。
+
+- 生产构建由 scripts/pwa-build.mjs 生成带内容版本的 Service Worker，仅预缓存静态白名单；API、带查询参数请求及写请求不进入 Cache Storage。开发和 demo 不注册 Worker；改缓存策略须运行 npm test 中的 PWA 隔离测试。

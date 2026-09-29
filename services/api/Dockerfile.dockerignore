@@ -11,6 +11,8 @@
 !apps/web/package-lock.json
 !apps/web/index.html
 !apps/web/vite.config.mjs
+!apps/web/scripts/
+!apps/web/scripts/pwa-build.mjs
 !apps/web/tsconfig.json
 !apps/web/src/
 !apps/web/src/**

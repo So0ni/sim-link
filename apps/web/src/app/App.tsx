@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { EnvelopeSimple, HardDrives, GearSix } from "@phosphor-icons/react";
 import { ApiClient, errorText } from "../shared/api/client.ts";
 import { SessionController } from "../features/auth/session.ts";
+import { PwaSettings } from "../pwa/PwaControls.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { InboxPage } from "../features/inbox/InboxPage.tsx";
 import { DevicesPage } from "../features/devices/DevicesPage.tsx";
@@ -55,7 +56,7 @@ export function App() {
           <p role="status">
             {state.status === "restoring"
               ? "正在确认此设备的登录状态…"
-              : "登录凭证已保留。连接恢复后即可继续。"}
+              : "登录凭证已保留。连接恢复后即可继续；重新打开时不提供离线短信。"}
           </p>
           {state.status === "unavailable" && (
             <button className="primary" onClick={() => void auth.restore()}>
@@ -112,6 +113,7 @@ export function App() {
       {page === "settings" && (
         <main className="main live-page">
           <h1>设置</h1>
+          <PwaSettings />
           <section className="live-card">
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>

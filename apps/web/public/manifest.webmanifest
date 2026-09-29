@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "SIMLink",
+  "short_name": "SIMLink",
+  "description": "安全访问你的远程 SIM 短信",
+  "lang": "zh-CN",
+  "start_url": "/#/inbox",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

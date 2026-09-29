@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { pwaBuild } from "./scripts/pwa-build.mjs";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -19,5 +20,5 @@ export default defineConfig({
       clientFiles: ["./src/main.tsx"],
     },
   },
-  plugins: [react()],
+  plugins: [react(), pwaBuild()],
 });

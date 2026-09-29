@@ -88,3 +88,8 @@
 @media (max-width: 799px) {
   .inbox-layout.has-detail { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 }
+
+.pwa-update { position: fixed; z-index: 100; top: max(12px, env(safe-area-inset-top)); right: 12px; width: min(360px, calc(100% - 24px)); padding: 16px; background: var(--background); border: 1px solid var(--borderControl); border-radius: 12px; box-shadow: 0 4px 20px #17203322; }
+.pwa-update p { margin: 8px 0; }
+.pwa-update > div { display: flex; gap: 12px; }
+.pwa-update button { min-height: 44px; padding: 8px 12px; }
