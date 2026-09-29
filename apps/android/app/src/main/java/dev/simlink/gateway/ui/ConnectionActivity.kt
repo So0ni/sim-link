@@ -40,8 +40,8 @@ class ConnectionActivity : ComponentActivity() {
                     AlertDialog.Builder(this).setTitle("允许本次内网 HTTP 调试？")
                         .setMessage("${code.server}\n\n此连接不加密凭证与短信，仅用于可信内网。确认后自动检查服务器，随后核对配对信息。")
                         .setNegativeButton("取消", null)
-                        .setPositiveButton("允许并检查") { _, _ -> checkAndReview(code.server, code.token, code.expiresAt, true, "留守手机") }.show()
-                } else checkAndReview(code.server, code.token, code.expiresAt, false, "留守手机")
+                        .setPositiveButton("允许并检查") { _, _ -> checkAndReview(code.server, code.token, code.expiresAt, true, "手机") }.show()
+                } else checkAndReview(code.server, code.token, code.expiresAt, false, "手机")
             } catch (_: Exception) { showError("二维码无效、已过期或版本不兼容。请在 Web 设备页重新生成，再次扫描。") }
         }
     }
@@ -112,7 +112,7 @@ class ConnectionActivity : ComponentActivity() {
     }
     private fun chooser() {
         route = "chooser"
-        startPage(if (connection == null) "连接服务器" else "更换服务器", "用 SIMLink Web 的配对二维码连接这部留守手机。")
+        startPage(if (connection == null) "连接服务器" else "更换服务器", "用 SIMLink Web 的配对二维码连接这部手机。")
         action("扫描配对二维码",true) {
             scanner.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("扫描 SIMLink Web 设备页的配对二维码").setBeepEnabled(false).setBarcodeImageEnabled(false))
         }
@@ -125,7 +125,7 @@ class ConnectionActivity : ComponentActivity() {
         route = "manual"
         startPage("手动连接", "输入 Web 设备页显示的地址和一次性配对码。")
         val server = field(content,"服务器地址",hintText="https://sim.example.com").apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
-        val name = field(content,"设备名称","留守手机")
+        val name = field(content,"设备名称","手机")
         val token = field(content,"一次性配对码",secret=true)
         val http = CheckBox(this).apply { text = "允许内网 HTTP 调试（连接未加密）"; setTextColor(style.muted); minHeight = style.dp(48); visibility = if (BuildConfig.DEBUG) View.VISIBLE else View.GONE }
         content.addView(http); actions.add(http)

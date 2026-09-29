@@ -317,7 +317,7 @@ export function DemoApp() {
     <div className="status warning">
       <WarningCircle size={22} />
       <div>
-        <strong>留守手机已离线</strong>
+        <strong>手机已离线</strong>
         <p>最后在线 14:32，仍可查看历史短信。</p>
         <a href="#/devices">
           查看设备 <CaretRight size={14} />
@@ -682,7 +682,7 @@ export function DemoApp() {
                             {m.status === "unknown" && (
                               <div className="unknown-panel">
                                 <strong>这条短信可能已经发出</strong>
-                                <p>请先核对收件方或留守手机，避免重复发送。</p>
+                                <p>请先核对收件方或手机，避免重复发送。</p>
                                 <button
                                   className="primary"
                                   onClick={() =>
@@ -775,7 +775,7 @@ export function DemoApp() {
           <section className="simple-page">
             <div className="mobile-brand">SIMLink</div>
             <h1>设备</h1>
-            <p className="muted">留守手机的连接与短信状态</p>
+            <p className="muted">手机的连接与短信状态</p>
             <div className={`device-summary ${offline ? "warning" : "online"}`}>
               <HardDrives size={30} />
               <div>
@@ -818,7 +818,7 @@ export function DemoApp() {
               <div className="status warning">
                 <WarningCircle size={23} />
                 <div>
-                  <strong>在留守手机检查连接</strong>
+                  <strong>在手机检查连接</strong>
                   <p>确认手机已联网，然后打开 SIMLink Gateway 查看运行状态。</p>
                 </div>
               </div>
@@ -929,7 +929,7 @@ export function DemoApp() {
           </div>
           <p>以下开关只模拟界面状态，不连接真实设备或发送短信。</p>
           <label className="toggle-row">
-            <span>留守手机离线</span>
+            <span>手机离线</span>
             <input
               type="checkbox"
               checked={offline}

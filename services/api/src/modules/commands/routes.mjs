@@ -2,7 +2,8 @@ import { object, string } from '../../platform/errors.mjs';
 const uuid = { ...string(36,36), pattern:'^[a-f0-9-]{36}$' };
 export function registerCommandRoutes(app,{commands,devices,sessions,rate}) {
   const device = req => devices.authenticate(req.headers.authorization?.match(/^Bearer ([\w-]{43})$/)?.[1]).id;
-  app.post('/api/v1/commands',{schema:{body:object({requestId:uuid,simId:uuid,recipient:string(40),body:string(1600),waitOffline:{type:'boolean'}})}},async req=>{
+  // Accept the deprecated flag from cached clients; queuing is now unconditional.
+  app.post('/api/v1/commands',{schema:{body:{...object({requestId:uuid,simId:uuid,recipient:string(40),body:string(1600),waitOffline:{type:'boolean'}}),required:['requestId','simId','recipient','body']}}},async req=>{
     sessions.write(req); rate('commands-create',30); return commands.create(req.body);
   });
   app.get('/api/v1/commands',async req=>{sessions.read(req);return commands.list();});

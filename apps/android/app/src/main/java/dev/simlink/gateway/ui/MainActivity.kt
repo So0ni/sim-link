@@ -240,7 +240,7 @@ open class MainActivity : ComponentActivity() {
         })
         content.addView(panel)
         section("此设备")
-        row(R.drawable.ic_smartphone,"留守手机",Build.MODEL)
+        row(R.drawable.ic_smartphone,"手机",Build.MODEL)
         row(R.drawable.ic_dns,"服务器",serverAddress) { connection() }
         val battery = getSystemService(BatteryManager::class.java).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
         row(R.drawable.ic_battery_full,"电量",if (battery in 0..100) "$battery%" else "暂时无法读取")

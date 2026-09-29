@@ -6,7 +6,7 @@ test('requires explicit international recipient; alphanumeric senders not reply 
  assert.equal(recipientNumber('Example'),null);assert.equal(recipientNumber('13800000000'),null);assert.equal(recipientNumber('+1 (555) 555-0123'),'+15555550123');
 });
 test('ambiguous submission queries original key; retransmission keeps exact payload',async()=>{
- const request={requestId:'original',simId:'same-sim',recipient:'+15555550123',body:'Fictional',waitOffline:false};let posted;
+ const request={requestId:'original',simId:'same-sim',recipient:'+15555550123',body:'Fictional'};let posted;
  const api={request:async(path,options)=>{if(!options)throw new ApiError(404);posted=options.body;return{id:'command'};}};
  assert.equal((await reconcileSubmission(api,request)).id,'command');assert.equal(posted,request);
  posted=undefined;assert.equal((await reconcileSubmission({request:async()=>({id:'existing'})},request)).id,'existing');assert.equal(posted,undefined);

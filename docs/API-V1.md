@@ -138,7 +138,7 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 
 浏览器端均使用已有持久会话；所有写请求需Origin/CSRF：
 
-- `POST /api/v1/commands`：`{requestId,simId,recipient,body,waitOffline}`。requestId是调用方UUID，simId来自SIM清单，号码必须国际格式 `+[1-9][0-9]{6,14}`（去除空白、括号与短横线），正文1–1600字符且非全空白，waitOffline布尔。成功200返回命令。不可变目标包括deviceId、simKey、subscriptionId、slotIndex；服务器时间起5分钟有效。发送能力必须已启用且SIM最后上报active；未显式waitOffline时要求60秒内有发送能力上报，普通heartbeat不代表可即时领取。409包括`idempotency_conflict`、`sim_unavailable`、`send_not_enabled`、`device_not_polling`；400无效输入，429频率限制（每分钟30次）。同requestId相同规范化内容返回原命令，不续期；不同内容409。
+- `POST /api/v1/commands`：`{requestId,simId,recipient,body}`。requestId是调用方UUID，simId来自SIM清单，号码必须国际格式 `+[1-9][0-9]{6,14}`（去除空白、括号与短横线），正文1–1600字符且非全空白，旧版可选waitOffline布尔仍接受但忽略，不参与幂等内容比较。成功200返回命令。不可变目标包括deviceId、simKey、subscriptionId、slotIndex；服务器时间起1小时有效。发送能力必须已启用且SIM最后上报active；统一允许离线排队，不再要求60秒内的能力上报；普通heartbeat不代表可即时领取。409包括`idempotency_conflict`、`sim_unavailable`、`send_not_enabled`；400无效输入，429频率限制（每分钟30次）。同requestId相同规范化内容返回原命令，不续期；不同内容409。
 - `GET /api/v1/commands`：`{commands:[...]}`，最近200条，按提交时间倒序。独立于收件sequence/阅读游标，不将发件标成入站或用户已读。当前无历史分页。
 - `GET /api/v1/commands/request/:requestId`：查询原请求，404表示未找到。提交超时需先查询；若未找到且用户继续，重用原requestId及完全相同内容，不创建新键。
 - `POST /api/v1/commands/:id/cancel`：只有pending可取消（已cancelled幂等），404不存在，409已领取或结束；领取/取消在数据库事务内竞争。设备撤销会取消尚未领取命令，保留历史。
@@ -151,6 +151,6 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 
 命令返回：id、requestId、deviceId、simId、simKey、subscriptionId、slotIndex、recipient、body、createdAt、expiresAt、claimRequestId（未领取null）、claimedAt、reportedAt、serverTime、state、reason、parts、interrupted。所有API仍no-store。时间轴只展示服务端接收/领取/报告时间；没有伪造蜂窝提交或对端送达时间。
 
-状态：pending等待手机；claimed只证明领取；领取后120秒无结果投影为unknown。pending超时为expired，claimed不因过期冒充“未发送”。全部分段成功为sent，无送达报告；全部明确失败为failed，成功与失败混合为partial，其余为unknown；cancelled和rejected均表示未发送。过期检查同时在服务端领取与Android蜂窝提交前执行；Android以响应serverTime计算剩余时间，减去完整请求耗时与本机单调时钟经过时间，不依赖手机墙上时钟。
+状态：pending等待手机；claimed只证明领取；领取后120秒无结果投影为unknown。pending超时为cancelled、reason=expired，后台每30秒清理，读取/领取时也检查截止时间，claimed不因过期冒充“未发送”。全部分段成功为sent，无送达报告；全部明确失败为failed，成功与失败混合为partial，其余为unknown；cancelled和rejected均表示未发送。既有任务保留原expiresAt，不延长历史任务；既有expired仍可读。过期检查同时在服务端领取与Android蜂窝提交前执行；Android以响应serverTime计算剩余时间，减去完整请求耗时与本机单调时钟经过时间，不依赖手机墙上时钟。
 
 Android先持久化领取游标，再领取；收到命令后在同一事务保留不可重入执行记录并推进游标，随后校验配对、权限、逻辑SIM与有效期。每个分段先落盘再调用SmsManager。已有执行记录绝不再次调用蜂窝发送；重启只补报已存分段，没有本地发送记录的执行中断记拒绝。网络重传的是命令/回执，不是短信。不能承诺蜂窝exactly-once。

@@ -99,8 +99,6 @@
 .send-page label { display:block; margin:0; }
 .send-page .live-card > p, .send-page .live-card > h2 { margin:0; }
 .send-page input:not([type=checkbox]), .send-page select, .send-page textarea { display:block; box-sizing:border-box; width:100%; min-height:48px; margin-top:8px; padding:12px; border:1px solid var(--borderControl); border-radius:8px; font:inherit; background:var(--background); color:inherit; }
-.send-page .send-wait { display:flex; gap:10px; align-items:flex-start; }
-.send-wait input { margin-top:4px; }
 .command-body { white-space:pre-wrap; overflow-wrap:anywhere; }
 .command-card details { margin:12px 0; }
 
@@ -111,9 +109,6 @@
 .send-back { display:inline-flex; align-items:center; min-height:48px; padding:8px 12px; color:var(--primary); border-radius:12px; }
 .send-back:hover { background:var(--surfaceSelected); }
 .send-actions { display:flex; align-items:center; justify-content:space-between; gap:20px; padding-top:16px; border-top:1px solid var(--borderSubtle); }
-.send-actions .send-wait { flex:1; min-width:0; line-height:1.5; }
-.send-wait input { flex:0 0 20px; width:20px; height:20px; margin:2px 0 0; accent-color:var(--primary); }
-.send-wait small { display:block; margin-top:4px; font-size:12px; color:var(--textSecondary); }
 .send-submit { flex:0 1 auto; max-width:50%; overflow-wrap:anywhere; }
 .send-history { display:grid; gap:16px; min-width:0; }
 .send-history-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
@@ -127,3 +122,5 @@
   .send-heading h1 { font-size:26px; }
   .send-back { padding-inline:8px; }
 }
+
+.send-actions .send-queue-help { flex:1; min-width:0; margin:0; }

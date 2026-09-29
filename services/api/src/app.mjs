@@ -65,6 +65,13 @@ export function createApp({
     sims: createSimService(db, now),
     commands: createCommandService(db, now),
   };
+  let expiryTimer;
+  app.addHook("onReady", async () => {
+    dependencies.commands.expire();
+    expiryTimer = setInterval(() => dependencies.commands.expire(), 30000);
+    expiryTimer.unref();
+  });
+  app.addHook("onClose", async () => clearInterval(expiryTimer));
   registerAuthRoutes(app, dependencies);
   registerDeviceRoutes(app, dependencies);
   registerInboxRoutes(app, dependencies);

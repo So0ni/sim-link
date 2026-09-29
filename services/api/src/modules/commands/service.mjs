@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { fail } from '../../platform/errors.mjs';
 
+const QUEUE_TTL_MS = 60 * 60 * 1000;
+
 export function createCommandService(db, now) {
   const get = id => db.prepare('SELECT * FROM commands WHERE id=?').get(id);
-  const expire = () => db.prepare("UPDATE commands SET state='expired' WHERE state='pending' AND expires_at<=?").run(now());
+  const expire = () => db.prepare("UPDATE commands SET state='cancelled',reason='expired' WHERE state='pending' AND expires_at<=?").run(now());
   const view = row => ({ id: row.id, requestId: row.request_id, deviceId: row.device_id, simId: row.sim_id,
     simKey: row.sim_key, subscriptionId: row.subscription_id, slotIndex: row.slot_index,
     recipient: row.recipient, body: row.body, createdAt: row.created_at, expiresAt: row.expires_at,
@@ -16,23 +18,22 @@ export function createCommandService(db, now) {
   };
   return {
     capability,
+    expire,
     create: db.transaction(body => {
       expire();
       const recipient = body.recipient.replace(/[\s()-]/g, '');
       if (!/^\+[1-9][0-9]{6,14}$/.test(recipient) || !body.body.trim()) fail(400, 'invalid_sms');
       const old = db.prepare('SELECT * FROM commands WHERE request_id=?').get(body.requestId);
       if (old) {
-        if (old.sim_id !== body.simId || old.recipient !== recipient || old.body !== body.body || Boolean(old.wait_offline) !== body.waitOffline) fail(409, 'idempotency_conflict');
+        if (old.sim_id !== body.simId || old.recipient !== recipient || old.body !== body.body) fail(409, 'idempotency_conflict');
         return view(old);
       }
       const sim = db.prepare('SELECT s.*,d.send_capability,d.send_capability_at FROM sims s JOIN devices d ON s.device_id=d.id WHERE s.id=?').get(body.simId);
       if (!sim || sim.state !== 'active') fail(409, 'sim_unavailable');
       if (sim.send_capability !== 1) fail(409, 'send_not_enabled');
-      // A heartbeat is not evidence of recent command polling.
-      if (!body.waitOffline && now() - sim.send_capability_at > 60000) fail(409, 'device_not_polling');
       const id = randomUUID(); const stamp = now();
       db.prepare(`INSERT INTO commands(id,request_id,device_id,sim_id,sim_key,subscription_id,slot_index,recipient,body,created_at,expires_at,state,wait_offline)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?)`).run(id,body.requestId,sim.device_id,sim.id,sim.local_key,sim.subscription_id,sim.slot_index,recipient,body.body,stamp,stamp+300000,body.waitOffline?1:0);
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?)`).run(id,body.requestId,sim.device_id,sim.id,sim.local_key,sim.subscription_id,sim.slot_index,recipient,body.body,stamp,stamp+QUEUE_TTL_MS,1);
       return view(get(id));
     }),
     list() { expire(); return { commands: db.prepare('SELECT * FROM commands ORDER BY created_at DESC,rowid DESC LIMIT 200').all().map(view) }; },

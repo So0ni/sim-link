@@ -72,7 +72,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
           刷新
         </button>
       </div>
-      <p className="muted">将 Android 留守设备连接到这台服务器。</p>
+      <p className="muted">将 Android 设备连接到这台服务器。</p>
       <section className="live-card">
         <h2>添加设备</h2>
         <p>

@@ -13,21 +13,22 @@ async function fixture(t) {
  const device=await pair(); const dh={authorization:`Bearer ${device.deviceToken}`};const simKey=randomUUID();
  await post('/api/v1/device/sims',{status:'available',sims:[{key:simKey,subscriptionId:1,slotIndex:0,carrier:'Test'}]},dh);
  const sim=(await app.inject({url:'/api/v1/sims',headers})).json().sims[0];
- const input=()=>({requestId:randomUUID(),simId:sim.id,recipient:'+15555550123',body:'Fictional remote test',waitOffline:false});
+ const input=()=>({requestId:randomUUID(),simId:sim.id,recipient:'+15555550123',body:'Fictional remote test'});
  const cap=enabled=>post('/api/v1/device/send-capability',{enabled},dh);
  const claim=id=>post('/api/v1/device/commands/claim',{requestId:id},dh);
  const report=(id,claimRequestId,parts,rejection=null)=>post(`/api/v1/device/commands/${id}/result`,{claimRequestId,parts,rejection,interrupted:false},dh);
  return{app,headers,post,dh,device,sim,input,cap,claim,report,pair,advance:n=>{stamp+=n;}};
 }
-test('send capability opt-in, separate credentials, CSRF and explicit offline consent',async t=>{
+test('send capability opt-in, separate credentials, CSRF and automatic offline queuing',async t=>{
  const f=await fixture(t);const body=f.input();
  assert.equal((await f.post('/api/v1/commands',body,{origin:'https://test.example'})).statusCode,401);
  assert.equal((await f.post('/api/v1/commands',body,{...f.headers,'x-csrf-token':'invalid'})).statusCode,403);
  assert.equal((await f.post('/api/v1/commands',body,{...f.dh,origin:'https://test.example'})).statusCode,401);
  assert.equal((await f.post('/api/v1/commands',body)).statusCode,409);
  await f.cap(true);f.advance(60001);
- assert.equal((await f.post('/api/v1/commands',body)).statusCode,409);
- assert.equal((await f.post('/api/v1/commands',{...body,waitOffline:true})).statusCode,200);
+ const queued=(await f.post('/api/v1/commands',body)).json();
+ assert.equal(queued.expiresAt-queued.createdAt,3600000);
+ for(const waitOffline of [true,false]) assert.equal((await f.post('/api/v1/commands',{...body,waitOffline})).json().id,queued.id);
  await f.cap(false);assert.equal((await f.claim(randomUUID())).json().command,null);
 });
 test('duplicate submission and claim response loss do not mint another command or lease',async t=>{
@@ -44,8 +45,8 @@ test('duplicate submission and claim response loss do not mint another command o
 test('cancellation, expiry and mapping changes forbid later claim; revocation preserves history',async t=>{
  const f=await fixture(t);await f.cap(true);
  const a=(await f.post('/api/v1/commands',f.input())).json();await f.post(`/api/v1/commands/${a.id}/cancel`);assert.equal((await f.claim(randomUUID())).json().command,null);
- const b=(await f.post('/api/v1/commands',f.input())).json();f.advance(300000);assert.equal((await f.claim(randomUUID())).json().command,null);
- assert.equal(f.app.store.prepare('SELECT state FROM commands WHERE id=?').get(b.id).state,'expired');
+ const b=(await f.post('/api/v1/commands',f.input())).json();f.advance(3600000);assert.equal((await f.claim(randomUUID())).json().command,null);
+ assert.equal(f.app.store.prepare('SELECT state FROM commands WHERE id=?').get(b.id).state,'cancelled');
  await f.cap(true);const c=(await f.post('/api/v1/commands',f.input())).json();
  await f.post('/api/v1/device/sims',{status:'available',sims:[]},f.dh);assert.equal((await f.claim(randomUUID())).json().command,null);
  assert.equal(f.app.store.prepare('SELECT reason FROM commands WHERE id=?').get(c.id).reason,'sim_changed');
@@ -86,9 +87,26 @@ test('v5 migration preserves data; claimed commands and results survive store re
  const sim=randomUUID(),key=randomUUID(),device=randomUUID();
  db.prepare("INSERT INTO devices(id,name,token_hash,created_at,send_capability,send_capability_at) VALUES(?,'Test','hash',1,1,1000)").run(device);
  db.prepare("INSERT INTO sims(id,device_id,local_key,subscription_id,slot_index,carrier,state,reported_at) VALUES(?,?,?,1,0,'Test','active',1)").run(sim,device,key);
- let service=createCommandService(db,()=>1000);const request={requestId:randomUUID(),simId:sim,recipient:'+15555550123',body:'Fictional persisted command',waitOffline:false};const c=service.create(request);const claimId=randomUUID();service.claim(device,claimId);db.close();
+ let service=createCommandService(db,()=>1000);const request={requestId:randomUUID(),simId:sim,recipient:'+15555550123',body:'Fictional persisted command'};const c=service.create(request);const claimId=randomUUID();service.claim(device,claimId);db.close();
  db=openStore(path);try{
   service=createCommandService(db,()=>5000);assert.equal(service.create(request).id,c.id);assert.equal(service.claim(device,randomUUID()).command,null);assert.equal(service.claim(device,claimId).command.id,c.id);
   service.report(device,c.id,{claimRequestId:claimId,parts:[-1],rejection:null,interrupted:false});assert.equal(service.find(request.requestId).state,'sent');
  }finally{db.close();}
+});
+
+test('one-hour queue boundary, background expiry, and late claimed results',async t=>{
+ t.mock.timers.enable({apis:['setInterval']});
+ const f=await fixture(t);await f.cap(true);
+ const first=f.input();const c=(await f.post('/api/v1/commands',first)).json();
+ const claimId=randomUUID();await f.claim(claimId);
+ const second=f.input();const waiting=(await f.post('/api/v1/commands',second)).json();
+ f.advance(3599999);t.mock.timers.tick(30000);
+ assert.equal(f.app.store.prepare('SELECT state FROM commands WHERE id=?').get(waiting.id).state,'pending');
+ assert.equal((await f.post('/api/v1/commands',second)).json().expiresAt,waiting.expiresAt);
+ f.advance(1);t.mock.timers.tick(30000);
+ const expired=f.app.store.prepare('SELECT state,reason FROM commands WHERE id=?').get(waiting.id);
+ assert.deepEqual(expired,{state:'cancelled',reason:'expired'});
+ assert.equal((await f.claim(randomUUID())).json().command,null);
+ assert.equal((await f.app.inject({url:`/api/v1/commands/request/${first.requestId}`,headers:f.headers})).json().state,'unknown');
+ assert.equal((await f.report(c.id,claimId,[-1])).json().state,'sent');
 });
