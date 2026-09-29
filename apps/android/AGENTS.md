@@ -4,7 +4,7 @@
 
 ## 平台与职责
 
-按现有规划以 Android 14 / minSdk 34 为实现起点，用户的 Android 14 真机为首个验证对象。不自行添加 Android 13 及更老的兼容分支；targetSdk/compileSdk 根据实施时稳定工具链与测试选择，不冻结为 34。
+按现有规划以 Android 14 / minSdk 34 为实现起点，用户已升级的 Android 16 真机为首个验证对象。不自行添加 Android 13 及更老的兼容分支；targetSdk/compileSdk 根据实施时稳定工具链与测试选择，不冻结为 34。
 
 使用 Kotlin 和官方 API；不采用 root、私有厂商 API、无障碍模拟点击来替代平台能力。不引入 GSM 音频桥。默认短信角色须实现完整职责；来电能力先验证，不把默认电话角色当轻量监听权限。
 
@@ -21,4 +21,4 @@
 
 共享颜色、字号层级和状态语义，使用 Android 原生返回、权限控件与安全区。常规触控至少 48dp，文字使用 sp；不把 PWA 管理后台嵌入 WebView 代替原生配置体验。
 
-当前无 Gradle 工程或构建命令。初始化后使用仓库内 Wrapper，记录实际 build/lint/unit/device 命令。单元测试可验证状态与队列，模拟器可验证 UI；真实 SMS、双卡、锁屏、重启、省电和厂商行为必须标明真机型号、系统及测试结果。没有真机不伪造验证通过，真实联调使用用户指定测试卡和号码。
+当前为 P0 本地能力实验：Kotlin 原生 View，minSdk 34、compileSdk/targetSdk 37，固定工具链见 [README](README.md)。使用仓库内 Wrapper：`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug`；JDK/SDK 配置、安装和真机验证见 README。P0 暂不接管默认短信角色，不得把它描述为角色路线已通过。单元测试可验证状态与队列，模拟器可验证 UI；真实 SMS、双卡、锁屏、重启、省电和厂商行为必须标明真机型号、系统及测试结果。没有真机不伪造验证通过，真实联调使用用户指定测试卡和号码。

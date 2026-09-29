@@ -1,0 +1,44 @@
+package dev.simlink.gateway
+
+import android.Manifest
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.telephony.SmsManager
+import android.telephony.SubscriptionManager
+import java.util.UUID
+
+object SmsSender {
+    /** Called only by explicit on-device send. There is deliberately no retry worker. */
+    fun send(context: Context, subId: Int, slot: Int, address: String, body: String): String {
+        require(normalizedRecipient(address) != null) { "请输入带国家区号的号码" }
+        require(body.isNotBlank()) { "请输入短信正文" }
+        check(context.checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) { "请先授予发送短信权限" }
+        check(context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) { "请先授予 SIM 读取权限" }
+        val selected = context.getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList
+            ?.firstOrNull { it.subscriptionId == subId && it.simSlotIndex == slot }
+        check(selected != null) { "SIM 已变化，请返回运行页重新检查" }
+        val manager = context.getSystemService(SmsManager::class.java).createForSubscriptionId(subId)
+        val parts = manager.divideMessage(body)
+        val id = UUID.randomUUID().toString()
+        val store = MessageStore.get(context)
+        // Persist every part before entering the modem API; a crash never causes automatic resend.
+        store.insert(id, address, body, subId, System.currentTimeMillis(), true, parts.size)
+        try {
+            val sent = ArrayList(parts.indices.map { i ->
+                PendingIntent.getBroadcast(context, 0,
+                    Intent(context, SentReceiver::class.java).apply {
+                        data = Uri.parse("simlink://sent/$id/$i")
+                        putExtra("message_id", id); putExtra("part_index", i)
+                    }, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
+            })
+            manager.sendMultipartTextMessage(address, null, parts, sent, null)
+        } catch (_: Exception) {
+            // The boundary may already have accepted work. Conservatively keep the result unknown.
+            store.interrupted(id)
+        }
+        return id
+    }
+}
