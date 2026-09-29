@@ -131,3 +131,26 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 - Web 独立推进两个游标，各轮最多20页。分页间状态可再次前移，后续页仍能发现；客户端按每条消息版本合并，保留未加载消息的状态直到对应收件页到达，丢弃较旧响应。页签卸载取消请求并丢弃私密内存；写入结果不确定时由后续轮询校准。
 
 升级前备份数据库及 WAL（或使用 SQLite backup）；不以旧服务打开 v5 数据库。新 Web 需要 v5 后端，同一容器构建部署；旧 Android 无需修改。
+
+## P2 远程发送（2026-09-29，能力 `sms.send.v1`）
+
+服务端SQLite v6，保留既有消息、阅读版本与会话。先升级服务端，再升级Android 0.4.0-p2/code9。旧Android不必同步升级：仍可收件，但发送能力默认关闭。新Android连接旧服务端时发送能力路由404会跳过远程发送，不影响原收件上传。无需修改既有heartbeat或SIM上报body。
+
+浏览器端均使用已有持久会话；所有写请求需Origin/CSRF：
+
+- `POST /api/v1/commands`：`{requestId,simId,recipient,body,waitOffline}`。requestId是调用方UUID，simId来自SIM清单，号码必须国际格式 `+[1-9][0-9]{6,14}`（去除空白、括号与短横线），正文1–1600字符且非全空白，waitOffline布尔。成功200返回命令。不可变目标包括deviceId、simKey、subscriptionId、slotIndex；服务器时间起5分钟有效。发送能力必须已启用且SIM最后上报active；未显式waitOffline时要求60秒内有发送能力上报，普通heartbeat不代表可即时领取。409包括`idempotency_conflict`、`sim_unavailable`、`send_not_enabled`、`device_not_polling`；400无效输入，429频率限制（每分钟30次）。同requestId相同规范化内容返回原命令，不续期；不同内容409。
+- `GET /api/v1/commands`：`{commands:[...]}`，最近200条，按提交时间倒序。独立于收件sequence/阅读游标，不将发件标成入站或用户已读。当前无历史分页。
+- `GET /api/v1/commands/request/:requestId`：查询原请求，404表示未找到。提交超时需先查询；若未找到且用户继续，重用原requestId及完全相同内容，不创建新键。
+- `POST /api/v1/commands/:id/cancel`：只有pending可取消（已cancelled幂等），404不存在，409已领取或结束；领取/取消在数据库事务内竞争。设备撤销会取消尚未领取命令，保留历史。
+
+设备端使用独立Bearer凭证，无浏览器Cookie：
+
+- `POST /api/v1/device/send-capability`：`{enabled:boolean}` → `{ok:true}`。Android仅在当前配对已主动启用远程发送，且SEND_SMS/READ_PHONE_STATE已授予时上报true；否则false。设备列表增量字段sendCapability（0/1）、sendCapabilityAt（服务端时间）。重配会清零能力。
+- `POST /api/v1/device/commands/claim`：`{requestId:UUID}` → `{command:null|命令,serverTime}`。Android在联网领取前持久化requestId，响应丢失重试同键只返回同一领取；新键不再领取已claimed的任务。仅领取本设备pending且未过期、目标映射active的命令；已变化映射记rejected/sim_changed。没有“租约超时重新入队”。空响应不绑定任务。
+- `POST /api/v1/device/commands/:id/result`：`{claimRequestId,rejection,parts,interrupted}` → 命令。rejection为null或permission_required/sim_changed/expired/connection_changed/execution_interrupted；执行前确定未发送可拒绝。parts为最多32项整数或null，未拒绝时至少1项，-1为Android RESULT_OK，其他整数为系统发送失败码，null未收到结果。第一次确认的非空结果不可改，后续空值不撤销已有结果，长度不可改变；晚到回执可以完善未知结果。404非本设备/无命令，409领取键或结果冲突。interrupted标记调用边界异常，不触发重发。
+
+命令返回：id、requestId、deviceId、simId、simKey、subscriptionId、slotIndex、recipient、body、createdAt、expiresAt、claimRequestId（未领取null）、claimedAt、reportedAt、serverTime、state、reason、parts、interrupted。所有API仍no-store。时间轴只展示服务端接收/领取/报告时间；没有伪造蜂窝提交或对端送达时间。
+
+状态：pending等待手机；claimed只证明领取；领取后120秒无结果投影为unknown。pending超时为expired，claimed不因过期冒充“未发送”。全部分段成功为sent，无送达报告；全部明确失败为failed，成功与失败混合为partial，其余为unknown；cancelled和rejected均表示未发送。过期检查同时在服务端领取与Android蜂窝提交前执行；Android以响应serverTime计算剩余时间，减去完整请求耗时与本机单调时钟经过时间，不依赖手机墙上时钟。
+
+Android先持久化领取游标，再领取；收到命令后在同一事务保留不可重入执行记录并推进游标，随后校验配对、权限、逻辑SIM与有效期。每个分段先落盘再调用SmsManager。已有执行记录绝不再次调用蜂窝发送；重启只补报已存分段，没有本地发送记录的执行中断记拒绝。网络重传的是命令/回执，不是短信。不能承诺蜂窝exactly-once。

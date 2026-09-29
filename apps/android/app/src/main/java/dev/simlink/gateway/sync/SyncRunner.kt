@@ -55,6 +55,7 @@ class SyncRunner(private val context: Context) {
                 api.heartbeat(token)
                 api.inventory(dev.simlink.gateway.telephony.SimInventory(context).refresh().json(), token)
                 inventorySupported = true
+                dev.simlink.gateway.commands.RemoteCommands(context,api,cancellation).run(connection,token)
             } catch (error: ApiFailure) { throw UploadFailure(error.status) }
         }).run()
     }

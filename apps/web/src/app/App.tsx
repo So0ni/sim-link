@@ -6,6 +6,7 @@ import { PwaSettings } from "../pwa/PwaControls.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { InboxPage } from "../features/inbox/InboxPage.tsx";
 import { DevicesPage } from "../features/devices/DevicesPage.tsx";
+import { SendPage } from '../features/send/SendPage.tsx';
 function useRoute() {
   const [path, setPath] = useState(location.hash.slice(1) || "/inbox");
   useEffect(() => {
@@ -66,7 +67,7 @@ export function App() {
         </div>
       </main>
     );
-  const page = path.startsWith("/devices")
+  const page = path.startsWith("/send") ? "send" : path.startsWith("/devices")
     ? "devices"
     : path.startsWith("/settings")
       ? "settings"
@@ -106,6 +107,7 @@ export function App() {
           <span className="host">{location.host}</span>
         </div>
       </aside>
+      <SendPage api={auth.api} path={path} visible={page === "send"} />
       {page === "inbox" && (
         <InboxPage api={auth.api} selected={selected} go={go} />
       )}
@@ -118,7 +120,7 @@ export function App() {
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>
             <p className="field-help">
-              当前短信持续保留，尚未提供自动清理。阅读状态已支持跨浏览器同步；从 Web 发送短信和通知推送仍在开发中。
+              当前短信持续保留，尚未提供自动清理。阅读状态已支持跨浏览器同步；远程发送需手机升级并主动启用，通知推送仍在开发中。
             </p>
             <button
               className="secondary"

@@ -59,6 +59,20 @@ open class MainActivity : ComponentActivity() {
         override fun run() { loadRecords(); handler.postDelayed(this, 2000) }
     }
 
+    private var commandPollRunning = false
+    private val commandPoll = object : Runnable {
+        override fun run() {
+            if (!commandPollRunning) {
+                commandPollRunning = true
+                dev.simlink.gateway.sync.NetworkIo.executor.execute {
+                    try { dev.simlink.gateway.sync.SyncRunner(applicationContext).run(dev.simlink.gateway.connection.RequestCancellation()) }
+                    catch (_: Exception) { /* Durable queues retry on the next poll. */ }
+                    finally { runOnUiThread { commandPollRunning = false } }
+                }
+            }
+            handler.postDelayed(this,15000)
+        }
+    }
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         page = state?.getString("page") ?: "运行"
@@ -96,11 +110,13 @@ open class MainActivity : ComponentActivity() {
         super.onResume()
         handler.removeCallbacks(refresh)
         handler.post(refresh)
+        handler.removeCallbacks(commandPoll)
+        handler.post(commandPoll)
         // Permission/role settings may have changed while away. Re-read instead of assuming success.
         dev.simlink.gateway.sync.SyncScheduler.schedule(applicationContext)
         draw()
     }
-    override fun onPause() { captureDraft(); handler.removeCallbacks(refresh); super.onPause() }
+    override fun onPause() { captureDraft(); handler.removeCallbacks(refresh); handler.removeCallbacks(commandPoll); super.onPause() }
     override fun onSaveInstanceState(out: Bundle) {
         captureDraft()
         out.putString("page", page); out.putString("address", draftAddress); out.putString("body", draftBody)
@@ -256,7 +272,7 @@ open class MainActivity : ComponentActivity() {
     private fun composePage() {
         title("发送测试短信")
         text("将通过实体 SIM 发送，可能产生运营商费用。只向你自己的测试号码发送。", true)
-        permissionRow("发送短信", Manifest.permission.SEND_SMS, "只在你点击发送时使用，不接受远程命令。")
+        permissionRow("发送短信", Manifest.permission.SEND_SMS, "本机测试会真实发送；远程发送需在权限页单独启用。")
         availableSims = readSims()
         text("发送 SIM")
         val spinner = Spinner(this).apply { minimumHeight = dp(48); contentDescription = "选择发送 SIM" }

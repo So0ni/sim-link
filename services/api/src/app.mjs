@@ -15,6 +15,9 @@ import { registerInboxRoutes } from "./modules/inbox/routes.mjs";
 import { createSimService } from "./modules/sims/service.mjs";
 import { registerSimRoutes } from "./modules/sims/routes.mjs";
 
+import { createCommandService } from './modules/commands/service.mjs';
+import { registerCommandRoutes } from './modules/commands/routes.mjs';
+
 // Composition root: lifecycle and wiring only. Business modules do not import this file.
 export function createApp({
   database = ":memory:",
@@ -60,11 +63,13 @@ export function createApp({
     devices: createDeviceService(db, now, origin),
     inbox: createInboxService(db, now),
     sims: createSimService(db, now),
+    commands: createCommandService(db, now),
   };
   registerAuthRoutes(app, dependencies);
   registerDeviceRoutes(app, dependencies);
   registerInboxRoutes(app, dependencies);
   registerSimRoutes(app, dependencies);
+  registerCommandRoutes(app, dependencies);
   app.get("/healthz", async () => {
     db.prepare("SELECT 1").get();
     return { status: "ok" };
@@ -74,7 +79,7 @@ export function createApp({
     apiVersion: 1,
     serverVersion: "0.1.0",
     serverId: dependencies.devices.serverId,
-    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory", "device.identity"],
+    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory", "device.identity", "sms.send.v1"],
   }));
   return app;
 }

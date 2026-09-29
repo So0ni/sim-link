@@ -21,7 +21,7 @@ export function createDeviceService(db, now, origin) {
     db.prepare("DELETE FROM pairings WHERE hash=?").run(hash(body.pairingToken));
     const deviceToken = token();
     db.prepare(`INSERT INTO devices(id,name,token_hash,created_at,revoked_at) VALUES(?,?,?,?,NULL)
-      ON CONFLICT(id) DO UPDATE SET token_hash=excluded.token_hash,revoked_at=NULL,last_seen_at=NULL,inventory_status=NULL,inventory_at=NULL`)
+      ON CONFLICT(id) DO UPDATE SET token_hash=excluded.token_hash,revoked_at=NULL,last_seen_at=NULL,inventory_status=NULL,inventory_at=NULL,send_capability=0,send_capability_at=NULL`)
       .run(deviceId, name, hash(deviceToken), now());
     // A successful rebind invalidates all outstanding recovery invitations for this device.
     db.prepare("DELETE FROM pairings WHERE target_device_id=?").run(deviceId);
@@ -60,7 +60,7 @@ export function createDeviceService(db, now, origin) {
     list() {
       return db
         .prepare(
-          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt, last_seen_at AS lastSeenAt, inventory_status AS inventoryStatus, inventory_at AS inventoryAt FROM devices WHERE revoked_at IS NULL ORDER BY created_at",
+          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt, last_seen_at AS lastSeenAt, inventory_status AS inventoryStatus, inventory_at AS inventoryAt, send_capability AS sendCapability, send_capability_at AS sendCapabilityAt FROM devices WHERE revoked_at IS NULL ORDER BY created_at",
         )
         .all().map(device => ({ ...device, presence: device.lastSeenAt === null ? "unknown" : now() - device.lastSeenAt <= 35 * 60 * 1000 ? "online" : "offline", serverTime: now() }));
     },
@@ -72,6 +72,7 @@ export function createDeviceService(db, now, origin) {
     revoke(id) {
       db.transaction(() => {
         db.prepare("DELETE FROM pairings WHERE target_device_id=?").run(id);
+        db.prepare("UPDATE commands SET state='cancelled',reason='device_revoked' WHERE device_id=? AND state='pending'").run(id);
         db.prepare("DELETE FROM devices WHERE id=?").run(id);
       })();
     },

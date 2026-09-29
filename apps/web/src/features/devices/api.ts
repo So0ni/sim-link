@@ -1,5 +1,7 @@
 import type { ApiClient } from "../../shared/api/client.ts";
 export type Device = {
+  sendCapability?: number;
+  sendCapabilityAt?: number | null;
   id: string;
   name: string;
   createdAt: number;

@@ -68,6 +68,9 @@ class GatewayApi(private val server: String, private val cancellation: RequestCa
         check(result.getString("deviceId") == deviceId && result.getString("serverId") == serverId && result.getString("installationId") == installationId)
         return serverId
     }
+    fun sendCapability(enabled: Boolean, token: String) { check(request("/api/v1/device/send-capability",JSONObject().put("enabled",enabled),token).getBoolean("ok")) }
+    fun claimCommand(requestId: String, token: String) = request("/api/v1/device/commands/claim",JSONObject().put("requestId",requestId),token)
+    fun commandResult(id: String, body: JSONObject, token: String) { check(request("/api/v1/device/commands/$id/result",body,token).getString("id") == id) }
     fun inventory(body: JSONObject, token: String) { check(request("/api/v1/device/sims", body, token).getBoolean("ok")) }
     fun heartbeat(token: String) { check(request("/api/v1/device/heartbeat", JSONObject(), token).getLong("receivedAt") >= 0) }
     fun unpair(token: String) {

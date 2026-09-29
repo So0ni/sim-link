@@ -14,8 +14,8 @@ import android.telephony.SubscriptionManager
 import java.util.UUID
 
 object SmsSender {
-    /** Called only by explicit on-device send. There is deliberately no retry worker. */
-    fun send(context: Context, subId: Int, slot: Int, address: String, body: String): String {
+    /** Caller must reserve remote commands durably before entry; no modem retries. */
+    fun send(context: Context, subId: Int, slot: Int, address: String, body: String, id: String = UUID.randomUUID().toString(), beforeSubmit: () -> Boolean = { true }): String {
         require(normalizedRecipient(address) != null) { "请输入带国家区号的号码" }
         require(body.isNotBlank()) { "请输入短信正文" }
         check(context.checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) { "请先授予发送短信权限" }
@@ -25,10 +25,10 @@ object SmsSender {
         check(selected != null) { "SIM 已变化，请返回运行页重新检查" }
         val manager = context.getSystemService(SmsManager::class.java).createForSubscriptionId(subId)
         val parts = manager.divideMessage(body)
-        val id = UUID.randomUUID().toString()
         val store = MessageStore.get(context)
         // Persist every part before entering the modem API; a crash never causes automatic resend.
-        store.insert(id, address, body, subId, System.currentTimeMillis(), true, parts.size)
+        check(parts.size in 1..32)
+        check(store.insert(id, address, body, subId, System.currentTimeMillis(), true, parts.size)) { "发件已记录，禁止重复提交" }
         try {
             val sent = ArrayList(parts.indices.map { i ->
                 PendingIntent.getBroadcast(context, 0,
@@ -37,6 +37,7 @@ object SmsSender {
                         putExtra("message_id", id); putExtra("part_index", i)
                     }, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
             })
+            check(beforeSubmit()) { "执行条件已改变" }
             manager.sendMultipartTextMessage(address, null, parts, sent, null)
         } catch (_: Exception) {
             // The boundary may already have accepted work. Conservatively keep the result unknown.

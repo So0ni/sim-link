@@ -11,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 5) {
+  if (version > 6) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -74,6 +74,19 @@ export function openStore(path) {
       CREATE TABLE reading_clock (singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL);
       INSERT INTO reading_clock VALUES(1,0);
       PRAGMA user_version=5;
+    `);
+  })();
+  if (version < 6) db.transaction(() => {
+    db.exec(`
+      ALTER TABLE devices ADD COLUMN send_capability INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE devices ADD COLUMN send_capability_at INTEGER;
+      CREATE TABLE commands (id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,device_id TEXT NOT NULL,
+        sim_id TEXT NOT NULL,sim_key TEXT NOT NULL,subscription_id INTEGER NOT NULL,slot_index INTEGER NOT NULL,
+        recipient TEXT NOT NULL,body TEXT NOT NULL,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
+        state TEXT NOT NULL,wait_offline INTEGER NOT NULL,claim_request_id TEXT,claimed_at INTEGER,reported_at INTEGER,
+        reason TEXT,parts TEXT,interrupted INTEGER NOT NULL DEFAULT 0,UNIQUE(device_id,claim_request_id));
+      CREATE INDEX commands_pending ON commands(device_id,state,created_at);
+      PRAGMA user_version=6;
     `);
   })();
   return db;

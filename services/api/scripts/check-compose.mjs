@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
@@ -46,7 +46,16 @@ try {
   const sim = (await request('/api/v1/sims')).body.sims[0];
   await request(`/api/v1/sims/${sim.id}`, 'PATCH', { name: 'Backup', phoneNumber: '+12025550100' });
   await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
+  await request('/api/v1/device/send-capability', 'POST', { enabled: true }, deviceHeaders);
+  const sendRequest = { requestId: randomUUID(), simId: sim.id, recipient: '+15555550123', body: 'Fictional remote command', waitOffline: false };
+  const command = (await request('/api/v1/commands', 'POST', sendRequest)).body;
+  const claimRequestId = randomUUID();
+  assert.equal((await request('/api/v1/device/commands/claim', 'POST', { requestId: claimRequestId }, deviceHeaders)).body.command.id, command.id);
   compose(['up', '-d', '--force-recreate', '--wait']);
+  assert.equal((await request('/api/v1/commands', 'POST', sendRequest)).body.id, command.id);
+  assert.equal((await request('/api/v1/device/commands/claim', 'POST', { requestId: randomUUID() }, deviceHeaders)).body.command, null);
+  await request(`/api/v1/device/commands/${command.id}/result`, 'POST', { claimRequestId, rejection: null, parts: [-1], interrupted: false }, deviceHeaders);
+  assert.equal((await request(`/api/v1/commands/request/${sendRequest.requestId}`)).body.state, 'sent');
   await request('/api/v1/auth/session');
   assert.equal((await request('/.well-known/sim-gateway')).body.serverId, identity.serverId);
   assert.equal((await request('/api/v1/device/identity', 'POST', { installationId, deviceId: device.deviceId, serverId: identity.serverId }, deviceHeaders)).body.deviceId, device.deviceId);
@@ -59,7 +68,7 @@ try {
   assert.deepEqual((await request('/api/v1/devices')).body.devices, []);
   assert.equal((await request('/api/v1/messages')).body.messages.length, 1);
   assert.equal((await fetch(`${origin}/api/v1/device/heartbeat`, { method: 'POST', headers: { ...deviceHeaders, 'content-type':'application/json', connection:'close' }, body:'{}' })).status,401);
-  console.info('Compose passed: heartbeat, unpair removes credentials but retains SMS; bundled UI/assets, private API, initialize, authenticate, pair, ingest, recreate, persist session, deduplicate.');
+  console.info('Compose passed: command persistence, no re-claim, idempotency, mock sent report; heartbeat, unpair removes credentials but retains SMS; bundled UI/assets, private API, initialize, authenticate, pair, ingest, recreate, persist session, deduplicate.');
 } finally {
   // This unique project contains only test-created credentials and fictional messages.
   compose(['down', '-v']);

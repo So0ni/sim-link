@@ -60,3 +60,7 @@ Android 已随 P1 接入分为 ui、connection、sync、telephony、data、platf
 后端接口回归覆盖鉴权、配对竞争、幂等与持久化；Web 模型测试覆盖异步会话与分组；浏览器验证真实登录、刷新、详情、退出及响应式；Compose 验证实际构建和重建持久化。演示数据只用于独立测试库，不上传真实短信。每次扩展记录已实现的端、兼容策略和未验证的真机行为。
 
 SIM inventory and immutable message mapping: [SIM-MAPPING.md](SIM-MAPPING.md). API business ownership: modules/sims; Android observation: telephony/SimInventory; Web editing and labels: features/sims.
+
+### P2 远程发送
+
+API新增 `modules/commands`，负责SQLite v6的持久命令、幂等、条件领取/取消与分段结果合并。Web `features/send` 使用同源API，发件记录与收件阅读游标分离；草稿仅内存。Android `commands` 处理当前配对的显式发送开关、持久领取游标和一次性执行记录，调用既有telephony/SmsSender；GatewayDatabase v5保留旧数据。SyncRunner复用网络执行器汇报/领取，前台15秒检查，后台不承诺即时性。无新常驻服务或依赖；旧Android兼容收件，新客户端遇旧服务端发送路由404跳过。

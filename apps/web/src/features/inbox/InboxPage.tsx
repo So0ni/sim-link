@@ -9,6 +9,7 @@ import type { ApiClient } from "../../shared/api/client.ts";
 import { useVisibleReading } from "./useVisibleReading.ts";
 import { useInbox } from "./useInbox.ts";
 import { conversations, simKey, simLabel, simTabs } from "./model.ts";
+import { recipientNumber } from '../send/model.ts';
 export function InboxPage({
   api,
   selected,
@@ -37,6 +38,7 @@ export function InboxPage({
           <div className="mobile-brand">SIMLink</div>
           <div className="title-row">
             <h1>短信</h1>
+            <a className="text-button" href="#/send">新建 / 发件</a>
             <button
               aria-label="刷新短信"
               disabled={inbox.busy}
@@ -141,6 +143,7 @@ export function InboxPage({
               </div>
             </header>
             <div className="reading-actions">
+              {recipientNumber(active.messages[0].sender) && active.messages[0].simKey && <a className="text-button" href={`#/send?sim=${encodeURIComponent(inbox.sims.find(s=>s.deviceId===active.messages[0].deviceId&&s.simKey===active.messages[0].simKey)?.id??'')}&to=${encodeURIComponent(active.messages[0].sender)}`}>回复 · 使用原 SIM</a>}
               <button disabled={inbox.readingBusy} onClick={() => {
                 visibleReading.suppress();
                 void inbox.markReading(active.messages, false);

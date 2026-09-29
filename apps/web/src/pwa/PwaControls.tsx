@@ -6,7 +6,7 @@ export function PwaUpdateNotice() {
   if (!state.update || deferred) return null;
   return <aside className="pwa-update" aria-label="应用更新" role="status">
     <strong>新版本已准备好</strong>
-    <p>更新将刷新已打开的 SIMLink 页面。</p>
+    <p>更新将刷新已打开的 SIMLink 页面，未提交草稿会丢失。请先处理尚未确认的发送请求。</p>
     <div><button className="primary" onClick={() => pwa.activate()}>更新并刷新</button>
       <button onClick={() => setDeferred(true)}>稍后</button></div>
   </aside>;

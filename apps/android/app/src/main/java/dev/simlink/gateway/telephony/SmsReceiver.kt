@@ -46,7 +46,7 @@ open class SentReceiver : BroadcastReceiver() {
         val result = resultCode
         val pending = goAsync()
         LocalIo.executor.execute {
-            try { MessageStore.get(context).result(id, index, result) }
+            try { MessageStore.get(context).result(id, index, result); SyncScheduler.schedule(context) }
             finally { pending.finish() }
         }
     }

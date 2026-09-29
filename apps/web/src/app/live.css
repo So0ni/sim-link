@@ -93,3 +93,13 @@
 .pwa-update p { margin: 8px 0; }
 .pwa-update > div { display: flex; gap: 12px; }
 .pwa-update button { min-height: 44px; padding: 8px 12px; }
+
+.send-page[hidden] { display: none; }
+.send-page { overflow-y:auto; padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
+.send-page label { display:block; margin:0; }
+.send-page .live-card > p, .send-page .live-card > h2 { margin:0; }
+.send-page input:not([type=checkbox]), .send-page select, .send-page textarea { display:block; box-sizing:border-box; width:100%; min-height:48px; margin-top:8px; padding:12px; border:1px solid var(--borderControl); border-radius:8px; font:inherit; background:var(--background); color:inherit; }
+.send-page .send-wait { display:flex; gap:10px; align-items:flex-start; }
+.send-wait input { margin-top:4px; }
+.command-body { white-space:pre-wrap; overflow-wrap:anywhere; }
+.command-card details { margin:12px 0; }

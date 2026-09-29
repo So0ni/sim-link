@@ -43,7 +43,7 @@ adb -s DEVICE_SERIAL shell am start -n dev.simlink.gateway/.MainActivity
 
 应用不访问系统历史短信库、不写系统 SMS Provider、不接管默认短信角色，也不承担 MMS/RCS 或电话能力。非默认应用由系统负责 SmsManager 发件的系统库写入。本地记录只有收到匹配服务端 ACK 后才标为已同步。
 
-接收广播若携带订阅信息则记录；缺失时写“SIM 归属未知”，不猜默认卡。subscriptionId 仅作为 P0 当次系统证据，不能作为未来后端的永久 SIM 身份；还没有持久 SIM 映射或远程发件队列；收件 outbox 已实现。
+接收广播若携带订阅信息则记录；缺失时写“SIM 归属未知”，不猜默认卡。subscriptionId 仅作为 P0 当次系统证据，不能作为未来后端的永久 SIM 身份；持久SIM映射和远程发件执行记录现已实现，见下文P2；收件outbox继续保留。
 
 短信内容不写日志或提交文件；本地私有数据排除云备份及设备迁移。数据库尚未加应用层加密。默认短信应用继续负责通知。草稿只在当前进程/界面状态中保存，不承诺进程被杀后恢复。
 
@@ -91,3 +91,9 @@ run `python3 apps/android/scripts/generate-tokens.py` from the repository root.
 `GatewayStyle` owns native components; `GatewaySetupPages` renders permission,
 SIM and background configuration without network or message-store access.
 Local test sending is accessible only in Debug via 设置 → 诊断与帮助 → 开发调试.
+
+## P2 远程发送（0.4.0-p2/code9）
+
+先升级服务端，再安装新版APK，原配对和数据保留。设置 → 短信与SIM权限 → 授权发送并“启用远程发送”；发送开关绑定当前配对，默认关闭。前台15秒检查命令，后台仍受系统15分钟调度和省电限制，可能超过5分钟有效期，小米可能逐条弹出发送确认。
+
+数据库v5持久保留领取请求键、执行记录和结果报告摘要；进程重启只补报，不再次提交蜂窝发送。发送前/调用边界前检查当前SIM和有效期；回执断网时本地分段结果保留，下一次同步补报。现阶段没有送达报告。Debug/Release、31项JVM测试与Lint通过；模拟器升级保留原虚构消息，实际蜂窝链路待用户指定SIM/号码验收，见[发送验收](../../docs/SENDING-ACCEPTANCE.md)。
