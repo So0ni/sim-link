@@ -92,9 +92,10 @@ export function InboxPage({
           )}
           {items.map((c) => {
             const last = c.messages.at(-1)!;
+            const unread = c.messages.filter(m => !m.isRead).length;
             return (
               <article
-                className={`conversation-row ${active?.id === c.id ? "selected" : ""}`}
+                className={`conversation-row ${unread ? "is-unread" : "is-read"} ${active?.id === c.id ? "selected" : ""}`}
                 key={c.id}
               >
                 <a
@@ -105,7 +106,7 @@ export function InboxPage({
                   <span className="avatar">{senderAvatar(last.sender)}</span>
                   <div className="row-content">
                     <div className="row-heading">
-                      <strong>{last.sender}{c.messages.some(m => !m.isRead) && <span className="unread-label">未读 {c.messages.filter(m => !m.isRead).length}</span>}</strong>
+                      <strong>{last.sender}{unread > 0 && <span className="unread-label">未读 {unread}</span>}</strong>
                       <time>
                         {new Date(last.receivedAt).toLocaleDateString()}
                       </time>

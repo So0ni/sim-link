@@ -182,3 +182,9 @@
   .device-presence { margin-left:auto; }
   .sim-summary { gap:8px; }
 }
+
+/* Reading state changes weight without moving or resizing the conversation row. */
+.inbox-list .conversation-row .row-heading strong { font-weight:400; }
+.inbox-list .conversation-row .row-content p { font-weight:400; }
+.inbox-list .conversation-row.is-unread .row-heading strong { font-weight:700; }
+.inbox-list .conversation-row.is-unread .row-content p { font-weight:600; color:var(--textPrimary); }
