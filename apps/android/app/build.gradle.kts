@@ -20,5 +20,5 @@ dependencies {
     implementation("androidx.activity:activity:1.10.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 }
