@@ -116,7 +116,7 @@ export function App() {
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>
             <p className="field-help">
-              当前短信持续保留，尚未提供自动清理。已读状态跨设备同步、从 Web 发送短信和通知推送仍在开发中。
+              当前短信持续保留，尚未提供自动清理。阅读状态已支持跨浏览器同步；从 Web 发送短信和通知推送仍在开发中。
             </p>
             <button
               className="secondary"

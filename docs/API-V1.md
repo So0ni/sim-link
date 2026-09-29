@@ -47,13 +47,13 @@ Android 必须先本地持久化事件及 eventId，再上传；网络重试携�
 
 提交 SQLite 事务后才返回 `{ eventId, sequence, syncedAt, duplicate }`；Android 仅收到匹配 ACK 后标记已同步。同设备同 eventId 同内容返回原 ACK（duplicate=true）；字段变化返回 409 event_conflict，不覆盖旧正文。不同设备事件 ID 空间独立。401 停止重试并提示重新配对；400/409 保留队列并提示处理；网络/5xx 可退避重试，不丢弃事件。换服务器时旧队列不得自动迁移。
 
-网页 GET `/api/v1/messages?after=0`（Cookie）返回 `{ messages, nextCursor }`，按 sequence 升序每页最多 100 条；每条包含 sequence/deviceId/eventId/sender/body/subscriptionId/receivedAt/syncedAt。nextCursor 使用不透明字符串处理；拉取至空页。本阶段为追加收件流，不实现搜索、已读、删除、通知或发件。Android 的本地 outgoing 记录不得通过本接口伪装为 incoming。
+网页 GET `/api/v1/messages?after=0`（Cookie）返回 `{ messages, nextCursor }`，按 sequence 升序每页最多 100 条；每条包含 sequence/deviceId/eventId/sender/body/subscriptionId/receivedAt/syncedAt、simKey、isRead（boolean）、readVersion（非负整数）。nextCursor 使用不透明字符串处理；拉取至空页。本阶段为追加收件流，不实现搜索、删除、通知或发件；阅读状态另走下述独立增量流。Android 的本地 outgoing 记录不得通过本接口伪装为 incoming。
 
 ## 交付边界
 
 - 已实现：本文件列出的服务端接口、数据库 v1、容器部署与测试。
 - Android 已实现：服务器连接页、Keystore 凭证、绑定配对 generation 的持久 outbox、JobScheduler 及匹配 ACK 后确认。只上传配对后新短信，历史记录不迁移；待真机联调。
-- PWA 已接入：真实登录/前台会话恢复、配对管理、读取收件流；跨端已读、发件、通知和 iOS 真机体验待验证。
+- PWA 已接入：真实登录/前台会话恢复、配对管理、读取收件流；跨浏览器已读/未读同步已接入；发件、通知和 iOS 真机体验待验证。
 - 真机下一步：明确选择测试后端，验证断网补传、重启和去重；不能把接口测试当成真实短信闭环。
 - 用户已决定：当前小米发送确认框仅记录为机型限制，不继续专门适配或调查，不阻塞 P1。
 
@@ -120,3 +120,14 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 - `GET /devices/recoverable`：管理员会话；返回已解绑但保留安装身份的 `{devices:[{id,name}]}`，不包含有效凭证，不混入正常设备列表。
 
 已知 installationId 使用普通邀请码返回 409，必须由管理员生成指定恢复邀请；不同 installationId 不得消费原安装的恢复邀请。成功恢复保留 deviceId、名称、SIM 与短信，轮换 token 并使其他恢复邀请失效。明确解绑取消未消费的恢复邀请，但保留安装恢复索引。完整语义见 [设备身份](DEVICE-IDENTITY.md)。
+
+## 阅读状态（SQLite v5）
+
+单管理员共享、按消息存储。旧记录和新收件均默认 `isRead=false, readVersion=0`，不猜测历史是否读过。与 Android 的系统已读、上传 ACK、送达无关；Android 上传协议和 ACK 不变，既有安装无需同时升级。旧 Web 可继续读取新增字段。
+
+- GET `/api/v1/messages/reading?after=0`：Cookie 鉴权，返回 `{states:[{sequence,isRead,readVersion}],nextCursor}`。独立于新增短信游标，按全局递增 readVersion 升序，每页最多100项；只返回已修改消息的最新状态，不是审计日志。默认版本0由收件页携带，独立流不重复发出。游标校验同收件流；不从 PATCH 返回值推进轮询游标。
+- PATCH `/api/v1/messages/reading`：Cookie + 同源 Origin + CSRF，设备 Bearer 不可用。请求 `{isRead:boolean,messages:[{sequence,readVersion}]}`，1–100个不同消息 ID。版本为调用者最后确认的版本，每项比较后更新。成功接受的项（包括同值写入）获得独立递增版本；过时项保持原状态。返回200 `{states:[...当前状态],conflicts:[...冲突消息ID]}`，可部分成功；客户端展示冲突并让用户确认后重试，不自动覆盖。重复ID/无效字段400；任一消息不存在404且整批不写。鉴权沿用现有401/403策略。
+- 服务端事务持久化状态和全局时钟。重复收件不改变阅读状态。只更新明确列出的消息，新到消息不被旧请求整会话清空。
+- Web 独立推进两个游标，各轮最多20页。分页间状态可再次前移，后续页仍能发现；客户端按每条消息版本合并，保留未加载消息的状态直到对应收件页到达，丢弃较旧响应。页签卸载取消请求并丢弃私密内存；写入结果不确定时由后续轮询校准。
+
+升级前备份数据库及 WAL（或使用 SQLite backup）；不以旧服务打开 v5 数据库。新 Web 需要 v5 后端，同一容器构建部署；旧 Android 无需修改。

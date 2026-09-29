@@ -74,3 +74,17 @@
 .live-device > div { min-width: 0; flex: 1; }
 .live-device > button { align-self: flex-start; flex-shrink: 0; }
 @media (max-width: 479px) { .live-device { flex-direction: column; } }
+
+.reading-filter, .reading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 0; }
+.reading-filter button, .reading-actions button { min-height: 44px; padding: 8px 12px; }
+.reading-filter button[aria-pressed="true"] { color: var(--primary); background: var(--primarySubtle, #eff6ff); }
+.reading-actions, .reading-feedback { padding: 8px 24px; }
+.unread-label { color: var(--primary); font-size: 12px; margin-left: 8px; white-space: nowrap; }
+.message-meta { flex-wrap: wrap; }
+.live-tabs button { flex: 0 0 auto; padding-inline: 12px; }
+.detail-pane .message-meta { display: flex; align-items: center; gap: 8px 12px; }
+.detail-pane .message-meta span { display: inline; margin: 0; }
+.reading-actions { flex-shrink: 0; }
+@media (max-width: 799px) {
+  .inbox-layout.has-detail { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}

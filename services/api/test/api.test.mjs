@@ -190,9 +190,10 @@ test('v1 migration removes revoked devices without losing SMS IDs or active cred
   db.close();
   const migrated = openStore(path);
   try {
-    assert.equal(migrated.pragma('user_version',{simple:true}),4);
+    assert.equal(migrated.pragma('user_version',{simple:true}),5);
     assert.deepEqual(migrated.prepare('SELECT id,token_hash,last_seen_at FROM devices').all(),[{id:'live',token_hash:'hash-live',last_seen_at:null}]);
     assert.equal(migrated.prepare('SELECT device_id FROM messages WHERE sequence=7').get().device_id,'old');
+    assert.deepEqual(migrated.prepare('SELECT is_read,read_version FROM messages WHERE sequence=7').get(), {is_read:0,read_version:0});
     assert.deepEqual(migrated.pragma('foreign_key_check'),[]);
     migrated.prepare("INSERT INTO messages(device_id,event_id,sender,body,received_at,synced_at) VALUES('live','next','Example','Fictional',1,2)").run();
     assert.equal(migrated.prepare('SELECT MAX(sequence) AS n FROM messages').get().n,8);
@@ -288,4 +289,58 @@ test('installation claims require an existing credential; recovery needs a targe
   assert.equal(restored.statusCode,200);
   assert.equal(restored.json().deviceId,old.deviceId);
   assert.deepEqual((await app.inject({url:'/api/v1/devices/recoverable',headers})).json().devices,[]);
+});
+
+test('reading changes authenticate admins, compare versions and sync old messages independently', async t => {
+  const { app, headers } = await fixture(t);
+  const device = await pair(app, headers);
+  const auth = { authorization: `Bearer ${device.deviceToken}` };
+  await app.inject({method:'POST',url:'/api/v1/device/messages',headers:auth,payload:event});
+  const loginB = await app.inject({method:'POST',url:'/api/v1/auth/login',headers:{origin},payload:{password}});
+  const b = {cookie:loginB.headers['set-cookie'].split(';')[0],origin,'x-csrf-token':loginB.json().csrfToken};
+  const patch = (h, messages, isRead) => app.inject({method:'PATCH',url:'/api/v1/messages/reading',headers:h,payload:{messages,isRead}});
+  const initial = [{sequence:1,readVersion:0}];
+  for (const [h,status] of [[{origin},401],[{...auth,origin},401],[{...headers,'x-csrf-token':'bad'},403],[{...headers,origin:'https://evil.test'},403]]) {
+    assert.equal((await patch(h,initial,true)).statusCode,status);
+  }
+  assert.equal((await app.inject('/api/v1/messages/reading')).statusCode,401);
+  const first = (await patch(headers,initial,true)).json();
+  assert.deepEqual(first,{states:[{sequence:1,isRead:true,readVersion:1}],conflicts:[]});
+  assert.deepEqual((await app.inject({url:'/api/v1/messages/reading?after=0',headers:b})).json().states,first.states);
+  const unread = (await patch(b,[{sequence:1,readVersion:1}],false)).json();
+  assert.equal(unread.states[0].readVersion,2);
+  const stale = (await patch(headers,initial,true)).json();
+  assert.deepEqual(stale,{states:unread.states,conflicts:[1]});
+  await app.inject({method:'POST',url:'/api/v1/device/messages',headers:auth,payload:{...event,eventId:'later'}});
+  assert.equal((await app.inject({url:'/api/v1/messages?after=1',headers})).json().messages[0].isRead,false);
+  assert.deepEqual((await app.inject({url:'/api/v1/messages/reading?after=1',headers})).json().states,unread.states);
+  assert.equal((await patch(headers,[{sequence:99,readVersion:0}],true)).statusCode,404);
+  assert.equal((await patch(headers,[...initial,...initial],true)).statusCode,400);
+  assert.equal((await app.inject({url:'/api/v1/messages/reading?after=-1',headers})).statusCode,400);
+});
+
+test('reading pagination tolerates rows moving ahead; state and clock persist on restart', async t => {
+  const dir = mkdtempSync(join(tmpdir(),'simlink-reading-'));
+  t.after(() => rmSync(dir,{recursive:true,force:true}));
+  const database = join(dir,'test.sqlite');
+  let app = createApp({origin,database});
+  await initializeAdmin(app.store,password);
+  const login = await app.inject({method:'POST',url:'/api/v1/auth/login',headers:{origin},payload:{password}});
+  const headers = {origin,cookie:login.headers['set-cookie'].split(';')[0],'x-csrf-token':login.json().csrfToken};
+  const device = await pair(app,headers);
+  for (let i=0;i<105;i++) await app.inject({method:'POST',url:'/api/v1/device/messages',headers:{authorization:`Bearer ${device.deviceToken}`},payload:{...event,eventId:`fictional-${i}`}});
+  const patch = (messages,isRead) => app.inject({method:'PATCH',url:'/api/v1/messages/reading',headers,payload:{messages,isRead}});
+  await patch(Array.from({length:100},(_,i)=>({sequence:i+1,readVersion:0})),true);
+  await patch(Array.from({length:5},(_,i)=>({sequence:i+101,readVersion:0})),true);
+  const first = (await app.inject({url:'/api/v1/messages/reading?after=0',headers})).json();
+  assert.equal(first.states.length,100);
+  await patch([{sequence:1,readVersion:1}],false);
+  const next = (await app.inject({url:`/api/v1/messages/reading?after=${first.nextCursor}`,headers})).json();
+  assert.deepEqual(next.states.map(s=>s.sequence),[101,102,103,104,105,1]);
+  await app.close();
+  app = createApp({origin,database});
+  try {
+    assert.equal((await app.inject({url:'/api/v1/messages',headers})).json().messages[0].isRead,false);
+    assert.equal((await patch([{sequence:1,readVersion:106}],true)).json().states[0].readVersion,107);
+  } finally { await app.close(); }
 });

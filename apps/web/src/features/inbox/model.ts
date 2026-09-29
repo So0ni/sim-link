@@ -1,5 +1,5 @@
 import { mappingKey, simTitle, type Sim } from "../sims/api.ts";
-import type { ReceivedMessage } from "./api.ts";
+import type { ReceivedMessage, ReadingState } from "./api.ts";
 export const simKey = (m: ReceivedMessage) =>
   JSON.stringify([m.deviceId, m.simKey ?? m.subscriptionId]);
 export const conversationKey = (m: ReceivedMessage) =>
@@ -25,7 +25,10 @@ export function mergeMessages(
   incoming: ReceivedMessage[],
 ) {
   const map = new Map(previous.map((m) => [m.sequence, m]));
-  incoming.forEach((m) => map.set(m.sequence, m));
+  incoming.forEach((m) => {
+    const old = map.get(m.sequence);
+    map.set(m.sequence, old && old.readVersion > m.readVersion ? { ...m, isRead: old.isRead, readVersion: old.readVersion } : m);
+  });
   return [...map.values()].sort((a, b) => a.sequence - b.sequence);
 }
 export function conversations(messages: ReceivedMessage[]) {
@@ -46,4 +49,18 @@ export function conversations(messages: ReceivedMessage[]) {
         b.messages.at(-1)!.receivedAt - a.messages.at(-1)!.receivedAt ||
         b.messages.at(-1)!.sequence - a.messages.at(-1)!.sequence,
     );
+}
+
+export function mergeReading(previous: Map<number, ReadingState>, incoming: ReadingState[]) {
+  const next = new Map(previous);
+  for (const state of incoming) {
+    if ((next.get(state.sequence)?.readVersion ?? -1) <= state.readVersion) next.set(state.sequence, state);
+  }
+  return next;
+}
+export function applyReading(messages: ReceivedMessage[], states: Map<number, ReadingState>) {
+  return messages.map(m => {
+    const state = states.get(m.sequence);
+    return state && state.readVersion >= m.readVersion ? { ...m, ...state } : m;
+  });
 }

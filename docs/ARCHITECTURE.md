@@ -36,7 +36,7 @@ Web：`app → features → shared`。功能模型不访问 DOM/fetch/localStora
 
 默认 `npm run dev`、`build`、`build:client` 和 Docker 均使用真实 API。`dev:demo` / `build:demo` 显式启用 VITE_SIMLINK_DEMO=1。生产构建排除 demo 模块；网络失败不回退到虚构数据、不采用 localStorage 演示登录标记。原型保留用于设计回归，不代表已实现业务。
 
-当前生产入口展示登录/会话、收件、设备列表、配对二维码、心跳推断在线和解绑清理。不显示虚构在线状态、模拟发送成功或本地已读冒充跨端同步。阅读状态、通知和发件待迭代；SIM持久映射及安装身份已实现，详见 SIM-MAPPING.md 与 DEVICE-IDENTITY.md。
+当前生产入口展示登录/会话、收件、设备列表、配对二维码、心跳推断在线和解绑清理。不显示虚构在线状态、模拟发送成功或本地已读冒充跨端同步。阅读状态独立版本同步已实现；通知和发件待迭代；SIM持久映射及安装身份已实现，详见 SIM-MAPPING.md 与 DEVICE-IDENTITY.md。
 
 ## 异步与权限边界
 

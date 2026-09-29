@@ -181,3 +181,32 @@ test('duplicate phone labels stay distinguishable without merging devices', () =
   assert.notEqual(tabs[0][0], tabs[1][0]);
   assert.notEqual(tabs[0][1], tabs[1][1]);
 });
+
+import { mergeReading, applyReading } from '../src/features/inbox/model.ts';
+test('reading versions survive late pages, reverse browser changes and unloaded message pagination', () => {
+  const base = {sequence:1, isRead:false, readVersion:0};
+  let states = mergeReading(new Map(),[{sequence:1,isRead:true,readVersion:1},{sequence:200,isRead:true,readVersion:2}]);
+  states = mergeReading(states,[{sequence:1,isRead:false,readVersion:3}]);
+  states = mergeReading(states,[{sequence:1,isRead:true,readVersion:1}]);
+  assert.equal(applyReading([base],states)[0].isRead,false);
+  assert.equal(applyReading([{...base,sequence:200}],states)[0].isRead,true);
+  assert.equal(mergeMessages([{...base,isRead:true,readVersion:5}],[base])[0].readVersion,5);
+});
+
+import { ReadingVisit } from '../src/features/inbox/readingVisit.ts';
+test('automatic reading ignores background, retains queued visibility while busy, and respects unread intent', () => {
+  const m = {sequence:1,isRead:false,readVersion:0};
+  const visit = new ReadingVisit();
+  assert.deepEqual(visit.collect([m],false,false),[]);
+  assert.deepEqual(visit.collect([m],true,true),[]);
+  assert.deepEqual(visit.collect([m],true,false),[m]);
+  assert.deepEqual(visit.collect([{...m,readVersion:2}],true,false),[]);
+  const later = {...m,sequence:2};
+  assert.deepEqual(visit.collect([m,later],true,false),[later]);
+  visit.suppress();
+  assert.deepEqual(visit.collect([{...m,sequence:3}],true,false),[]);
+  assert.deepEqual(new ReadingVisit().collect([m],true,false),[m]);
+  const alreadyRead = new ReadingVisit();
+  alreadyRead.collect([{...m,isRead:true}],true,false);
+  assert.deepEqual(alreadyRead.collect([m],true,false),[]);
+});

@@ -11,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 4) {
+  if (version > 5) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -65,6 +65,16 @@ export function openStore(path) {
       PRAGMA user_version=4;
     `);
     db.prepare("INSERT INTO server_identity VALUES(1,?)").run(randomUUID());
+  })();
+  if (version < 5) db.transaction(() => {
+    db.exec(`
+      ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0 CHECK(is_read IN (0,1));
+      ALTER TABLE messages ADD COLUMN read_version INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX messages_read_version ON messages(read_version);
+      CREATE TABLE reading_clock (singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL);
+      INSERT INTO reading_clock VALUES(1,0);
+      PRAGMA user_version=5;
+    `);
   })();
   return db;
 }

@@ -20,6 +20,20 @@ export function registerInboxRoutes(app, { inbox, devices, sessions }) {
       return ack;
     },
   );
+  app.get("/api/v1/messages/reading", async req => {
+    sessions.read(req);
+    return inbox.readingChanges(req.query.after);
+  });
+  app.patch("/api/v1/messages/reading", { schema: { body: object({
+    isRead: { type: "boolean" },
+    messages: { type: "array", minItems: 1, maxItems: 100, items: object({
+      sequence: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
+      readVersion: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    }) },
+  }) } }, async req => {
+    sessions.write(req);
+    return inbox.updateReading(req.body);
+  });
   app.get("/api/v1/messages", async (req) => {
     sessions.read(req);
     return inbox.list(req.query.after);
