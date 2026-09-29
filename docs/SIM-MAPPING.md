@@ -29,3 +29,5 @@ Web「设备」中可为每个映射填写备注名及可选电话号码。电�
 平台依据：[SubscriptionManager](https://developer.android.com/reference/android/telephony/SubscriptionManager)。
 
 2026-09-29 交付检查：后端 14 项、Web 15 项、Android 26 项测试通过；Web 类型检查/构建、Android Debug/未签名 Release 构建与 Lint 通过。独立 Compose 持久化检查通过。本地调试服务已在私有备份后迁移到 SQLite v3，保留原有设备及短信。Android 0.3.0-p1 已覆盖安装并冷启动成功。真实清单上报暂未通过：电脑和手机 Wi-Fi 网段变化，原调试地址不可达；失败在新版安装前已出现，需恢复网络或更新调试地址后继续验收。
+
+随后按用户选择更新本地调试地址，保留同一数据卷；服务健康，手机通过新地址的 HTTP 健康检查返回 200。等待用户在新地址重新扫码配对后，继续核验真实 SIM 清单；旧配对条目暂保留，确认新连接后再清理。
