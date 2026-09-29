@@ -8,11 +8,11 @@ final result: passed
 
 - Pixel 10a 模拟器，API 37.2，emulator-5554。使用 ADB 直接点击、滑动、读取 UI 树及截图。
 - 原始屏幕 1080×2424、420dpi，约411dp宽。另测试1080×2340、480dpi（360×780dp），1170×2532、480dpi（390×844dp）。字体缩放1.0与1.5；完成后恢复原始分辨率、密度和1.0字体。
-- 截图目录：[android-2026-09-29](design/qa/android-2026-09-29/)。仅包含模拟器状态与明确虚构的测试短信。
+- 截图目录：android-2026-09-29（本地验收截图，不随源码分发）。仅包含模拟器状态与明确虚构的测试短信。
 - Source visual truth：`design/vision/android-gateway-status-white-blue.png`、`android-sms-setup.png`、`android-background-setup.png`、`android-connect-server.png`、`android-sim-setup.png`。
-- 全图组合对照：[comparison.png](design/qa/android-2026-09-29/comparison.png)。原图运行页853×1844；实现1080×2424，裁去顶部142px系统区域与底部63px手势区域，各自等比缩至390px宽；没有拉伸到同高。此处390px用于视觉密度归一，不能当成同设备同状态像素差分。
+- 全图组合对照：comparison.png（本地验收截图，不随源码分发）。原图运行页853×1844；实现1080×2424，裁去顶部142px系统区域与底部63px手势区域，各自等比缩至390px宽；没有拉伸到同高。此处390px用于视觉密度归一，不能当成同设备同状态像素差分。
 - 状态区别：源图为已配对/双卡/向导，实现为未配对/未授权与独立设置页面。成功提示、默认短信角色、SIM开关和四步进度均未伪装实现。
-- 局部对照：[navigation-comparison.png](design/qa/android-2026-09-29/navigation-comparison.png)。两张同尺寸原始截图裁取相同导航区域再缩放。
+- 局部对照：navigation-comparison.png（本地验收截图，不随源码分发）。两张同尺寸原始截图裁取相同导航区域再缩放。
 
 ## 发现、修正与复核
 

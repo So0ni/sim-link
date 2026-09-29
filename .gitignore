@@ -16,3 +16,19 @@ Thumbs.db
 
 # Runtime logs
 *.log
+
+# Session handoffs and private local operations; never source documentation
+.local/
+[Hh][Aa][Nn][Dd][Oo][Ff][Ff].md
+[Hh][Aa][Nn][Dd][Oo][Ff][Ff]-*.md
+
+# Local QA captures; reviewed public screenshots belong in docs/images/
+/docs/qa/
+/design/qa/
+/apps/web/qa/
+
+# Credentials and signing material, regardless of module
+*.jks
+*.keystore
+*.pem
+*.key

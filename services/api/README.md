@@ -59,7 +59,7 @@ mkdir -p backups
 chmod 700 backups
 docker compose stop api
 backup_name="simlink-$(date +%Y%m%d-%H%M%S).tar.gz"
-docker compose run --rm --no-deps --entrypoint tar api -czf - -C /data . > "backups/$backup_name"
+docker compose run -T --interactive=false --rm --no-deps --entrypoint tar api -czf - -C /data . > "backups/$backup_name"
 docker compose start api
 chmod 600 "backups/$backup_name"
 ```
@@ -100,32 +100,10 @@ ALLOW_INSECURE_LOCAL=0
 HTTP 将明文传输密码、设备凭证和短信，仅用于可信内网调试；Cookie 仍为 HttpOnly/SameSite，Origin/CSRF 仍校验，但没有 Secure。手机访问 localhost 是手机自身。HTTP 下剪贴板、安装型 PWA 和推送等安全上下文功能不作为调试验收条件；公网与 Release APK 使用现有主机 HTTPS 代理。
 
 
-## 本机持久调试实例
+## 独立开发实例
 
-本次调试采用 Compose 项目名 `simlink-debug`，独立卷 `simlink-debug_simlink-data`。本机参数位于忽略提交的 `.env`，初始化密码保存在本机 `data/local-debug-login.txt`（权限 600），不写入仓库。维护此实例时使用同一项目名：
+开发与验收使用独立 Compose 项目、数据卷和虚构数据，不要把个人部署当成一次性测试库。固定项目名并在后续维护时保持一致；管理员密码仅在受保护的本地凭证管理工具中保存，不进入仓库。不要对已有数据卷执行 `down -v`。
 
-```sh
-docker compose -p simlink-debug ps
-docker compose -p simlink-debug up -d --build --wait
-docker compose -p simlink-debug stop
-```
-
-地址随本机局域网 IP 变化，需要同步修改 `.env` 并重建容器；Android 应使用“修改服务器地址（保留配对）”，凭证失效时使用原设备恢复码，详见设备身份文档。配对后的新短信持久保存于调试卷，旧手机记录不会自动导入。不要使用 `down -v` 清理此实例。
-
-
-心跳已接入：设备页展示最后联系与推断在线状态（35 分钟阈值），每 30 秒自动刷新。解除配对删除有效设备条目和凭证，短信保留。数据库升级到 v2 时自动清理旧 revoked_at 条目；迁移前先备份数据卷。旧版仅本地解除但未通知后端的条目需手动在 Web 解除。
-
-### SIM 管理（SQLite v3）
-
-新设备清单接口、Web 备注名/电话号码编辑与消息 simKey 已接通。升级前备份数据卷，先更新本容器，再安装 Android 0.3.0-p1。旧 Android 收件兼容；历史短信不自动关联当前卡。详细规则见 [SIM 映射](../../docs/SIM-MAPPING.md)。
-
-### 设备身份（SQLite v4）
-
-数据库持久化 serverId 与安装恢复索引。变更 PUBLIC_ORIGIN 后，同一 Android 可验证旧凭证并修改地址；管理员可以为原设备生成专用恢复二维码。解绑仍移除有效设备，已登记安装另列在折叠的恢复列表，未授予访问权限。详见 [设备身份](../../docs/DEVICE-IDENTITY.md)。
-
-### 阅读状态（SQLite v5）
-
-按消息持久化共享阅读状态，历史消息明确迁移为未读；新增独立状态增量接口与比较版本写入，见 [API](../../docs/API-V1.md)。升级前按上述备份流程保存现有卷，新 Web 与后端同镜像部署；Android 无需同时更新。隔离验收后，2026-09-29已备份并更新 simlink-debug 持久实例；迁移与容器重启会话验证通过，见阅读状态验收记录。
 
 ## 小内存服务器：预构建镜像 + 现有 Tunnel
 

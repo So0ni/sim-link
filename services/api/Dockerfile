@@ -18,6 +18,7 @@ WORKDIR /app
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=web --chown=node:node /build/apps/web/dist/client ./public
 COPY --chown=node:node services/api/package.json ./
+COPY --chown=node:node LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=node:node services/api/src ./src
 RUN mkdir /data && chown node:node /data
 USER node

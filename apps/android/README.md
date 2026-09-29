@@ -1,6 +1,6 @@
-# SIMLink Gateway · Android P1
+# SIMLink Gateway · Android
 
-Android 14+ 原生 Kotlin 网关。已有本地短信收发实验，并加入扫码/手动配对、Keystore 凭证、持久收件队列和 JobScheduler 上传。单 application 模块；扫码采用 ZXing Embedded，连接页面采用 AndroidX Activity 接收扫描结果。模块与同步语义见 [P1 同步说明](docs/P1-SYNC.md)；P1 尚未完成真机联调。
+Android 14+ 原生 Kotlin 网关。已有本地短信收发实验，并加入扫码/手动配对、Keystore 凭证、持久收件队列和 JobScheduler 上传。单 application 模块；扫码采用 ZXing Embedded，连接页面采用 AndroidX Activity 接收扫描结果。模块与同步语义见 [P1 同步说明](docs/P1-SYNC.md)；核心收件已有真机验收；远程发件、长期后台和新版完整真机回归仍待完成。
 
 ## 工具链
 
@@ -74,7 +74,7 @@ P0 先测非默认应用路线，避免在没有实现默认角色完整职责�
 
 Debug APK 可勾选内网 HTTP 调试；Release 仍强制 HTTPS，普通证书验证不变。详细后端配置见 [后端部署说明](../../services/api/README.md)。HTTP 未加密，不把它用于公网真实数据。
 
-本轮 Debug、未签名 Release 构建和 JVM 检查通过；release APK 不是可直接安装的正式签名发行版。数据库 v2 迁移/Keystore/JobScheduler 和页面操作尚待在线真机；当前用户尚未部署后端。
+本轮 Debug、未签名 Release 构建和 JVM 检查通过；release APK 不是可直接安装的正式签名发行版。该阶段的数据库 v2 迁移/Keystore/JobScheduler 和页面操作当时尚待在线真机；后续已完成公网部署与模拟器收件；本段是当时的构建记录。
 
 ### SIM 清单（0.3.0-p1）
 
