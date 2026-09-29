@@ -64,3 +64,9 @@ export function applyReading(messages: ReceivedMessage[], states: Map<number, Re
     return state && state.readVersion >= m.readVersion ? { ...m, ...state } : m;
   });
 }
+
+export function senderAvatar(sender: string) {
+  const value=sender.trim();
+  const digits=value.replace(/\D/g,'');
+  return digits && /^[+\d\s().-]+$/.test(value) ? digits.slice(-2) : Array.from(value)[0]?.toUpperCase() || '?';
+}

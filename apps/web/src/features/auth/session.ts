@@ -23,9 +23,10 @@ export class SessionController {
     this.current = state;
     this.listeners.forEach((fn) => fn());
   }
-  private invalidate() {
+  invalidate = () => {
     this.epoch++;
     this.api.clearSession();
+    this.api.views.clear();
     this.set({ status: "guest" });
   }
   async restore() {
@@ -38,7 +39,10 @@ export class SessionController {
       if (epoch !== this.epoch) return;
       this.api.setSession(session.csrfToken);
       await this.api.request("/auth/resume", { method: "POST" });
-      if (epoch === this.epoch) this.set({ status: "ready", session });
+      if (epoch === this.epoch) {
+        this.api.views.activate(session.id,session.expiresAt);
+        this.set({ status: "ready", session });
+      }
     } catch {
       // A 401 has already transitioned to guest. Network failures preserve the server cookie.
       if (epoch === this.epoch) this.set(previous.status === "ready" ? previous : { status: "unavailable" });

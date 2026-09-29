@@ -1,14 +1,15 @@
+import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
+import { PageBrand } from "../../shared/ui/PageBrand.tsx";
 import { useState } from "react";
 import {
   ArrowLeft,
-  ArrowClockwise,
   Copy,
   EnvelopeSimple,
 } from "@phosphor-icons/react";
 import type { ApiClient } from "../../shared/api/client.ts";
 import { useVisibleReading } from "./useVisibleReading.ts";
 import { useInbox } from "./useInbox.ts";
-import { conversations, simKey, simLabel, simTabs } from "./model.ts";
+import { conversations, simKey, simLabel, simTabs, senderAvatar } from "./model.ts";
 import { recipientNumber } from '../send/model.ts';
 export function InboxPage({
   api,
@@ -35,17 +36,11 @@ export function InboxPage({
     <main className={`main inbox-layout ${selected ? "has-detail" : ""}`}>
       <section className="inbox-list" aria-label="短信列表">
         <div className="list-top">
-          <div className="mobile-brand">SIMLink</div>
+          <PageBrand />
           <div className="title-row">
             <h1>短信</h1>
             <a className="text-button" href="#/send">新建 / 发件</a>
-            <button
-              aria-label="刷新短信"
-              disabled={inbox.busy}
-              onClick={() => void inbox.refresh()}
-            >
-              <ArrowClockwise size={22} />
-            </button>
+            <RefreshButton label="刷新短信" onRefresh={inbox.refresh} />
           </div>
           <div
             className="sim-tabs live-tabs"
@@ -70,7 +65,7 @@ export function InboxPage({
             <button aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>未读 {unreadCount}</button>
           </div>
           <div className="list-context">
-            <span>{inbox.busy ? "正在刷新…" : `已加载 ${items.length} 个会话`}</span>
+            <span>{`已加载 ${items.length} 个会话`}</span>
             <span>
               {inbox.updatedAt
                 ? `刷新于 ${new Date(inbox.updatedAt).toLocaleTimeString()}`
@@ -88,7 +83,7 @@ export function InboxPage({
           {!items.length && (
             <div className="empty">
               <EnvelopeSimple size={32} />
-              <h2>{inbox.busy ? "正在读取短信" : unreadOnly ? "没有未读短信" : "还没有同步的短信"}</h2>
+              <h2>{inbox.busy && !inbox.updatedAt ? "正在读取短信" : unreadOnly ? "没有未读短信" : "还没有同步的短信"}</h2>
               <p>{unreadOnly ? "当前 SIM 范围内没有已加载的未读短信。" : "设备上传的新短信会显示在这里。"}</p>
               {unreadOnly ? <button className="text-button" onClick={() => setUnreadOnly(false)}>查看全部</button> : (
                 <a className="text-button" href="#/devices">查看设备</a>
@@ -107,7 +102,7 @@ export function InboxPage({
                   href={`#/inbox/${encodeURIComponent(c.id)}`}
                   aria-label={`查看 ${last.sender} 的短信`}
                 >
-                  <span className="avatar">{last.sender.slice(0, 1)}</span>
+                  <span className="avatar">{senderAvatar(last.sender)}</span>
                   <div className="row-content">
                     <div className="row-heading">
                       <strong>{last.sender}{c.messages.some(m => !m.isRead) && <span className="unread-label">未读 {c.messages.filter(m => !m.isRead).length}</span>}</strong>
@@ -123,7 +118,6 @@ export function InboxPage({
             );
           })}
         </div>
-        <p className="list-footnote">页面打开时每 5 秒自动检查新短信 · 可点击右上角刷新</p>
       </section>
       <section className="detail-pane" aria-label="短信详情">
         {inbox.readingError && <p className="live-error reading-feedback" role="alert">{inbox.readingError} 可用“标为已读 / 未读”重试。</p>}

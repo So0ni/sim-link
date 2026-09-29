@@ -1,3 +1,4 @@
+import { ViewCache } from "./viewCache.ts";
 export class ApiError extends Error {
   status: number;
   constructor(status: number) {
@@ -6,6 +7,7 @@ export class ApiError extends Error {
   }
 }
 export class ApiClient {
+  readonly views = new ViewCache();
   private csrf = "";
   private generation = 0;
   onUnauthorized: () => void = () => {};

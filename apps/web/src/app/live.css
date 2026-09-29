@@ -59,7 +59,7 @@
 }
 @media (max-width: 799px) {
   .live-page {
-    padding: 24px 20px 100px;
+    padding: 14px 20px 100px;
   }
   .live-card {
     padding: 20px;
@@ -119,8 +119,21 @@
   .send-content { gap:24px; }
   .send-actions { flex-direction:column; align-items:stretch; gap:16px; }
   .send-submit { width:100%; max-width:none; }
-  .send-heading h1 { font-size:26px; }
   .send-back { padding-inline:8px; }
 }
 
 .send-actions .send-queue-help { flex:1; min-width:0; margin:0; }
+
+.refresh-button { display:inline-flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; height:48px; min-height:48px; padding:0; border:0; border-radius:12px; background:transparent; color:var(--textSecondary); }
+.refresh-button:hover { color:var(--primary); background:var(--surfaceSelected); }
+.refresh-button[aria-busy=true] { color:var(--primary); opacity:1; }
+.refresh-spin { animation:refresh-turn .8s linear infinite; }
+@keyframes refresh-turn { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .refresh-spin { animation:none; } }
+.live-section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.live-section-heading h2 { margin:0; }
+.refresh-time { min-height:20px; }
+.startup-placeholder { width:100%; height:80px; border-radius:12px; background:var(--surfaceSelected); margin-top:24px; }
+@media (max-width:799px) { .send-content > .mobile-brand { margin-bottom:-20px; } }
+
+.live-page > .title-row { min-height:48px; }

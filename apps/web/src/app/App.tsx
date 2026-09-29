@@ -1,3 +1,5 @@
+import { PageBrand } from "../shared/ui/PageBrand.tsx";
+import { VIEW_CACHE_KEY } from "../shared/api/viewCache.ts";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { EnvelopeSimple, HardDrives, GearSix } from "@phosphor-icons/react";
 import { ApiClient, errorText } from "../shared/api/client.ts";
@@ -29,6 +31,8 @@ export function App() {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     void auth.restore();
+    const cleared=(event:StorageEvent)=>{if(event.key===VIEW_CACHE_KEY && event.newValue===null)auth.invalidate();};
+    window.addEventListener("storage",cleared);
     const visible = () => {
       if (
         document.visibilityState === "visible" &&
@@ -39,6 +43,7 @@ export function App() {
     document.addEventListener("visibilitychange", visible);
     window.addEventListener("online", visible);
     return () => {
+      window.removeEventListener("storage",cleared);
       document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("online", visible);
     };
@@ -49,16 +54,8 @@ export function App() {
       <main className="auth-screen">
         <div className="auth-card">
           <div className="wordmark">SIMLink</div>
-          <h1>
-            {state.status === "restoring"
-              ? "正在恢复登录"
-              : "暂时无法连接服务器"}
-          </h1>
-          <p role="status">
-            {state.status === "restoring"
-              ? "正在确认此设备的登录状态…"
-              : "登录凭证已保留。连接恢复后即可继续；重新打开时不提供离线短信。"}
-          </p>
+          {state.status === "unavailable" && <><h1>暂时无法连接服务器</h1><p role="status">登录凭证已保留。连接恢复后即可继续。</p></>}
+          {state.status === "restoring" && <div className="startup-placeholder" aria-label="正在打开 SIMLink" role="status" /> }
           {state.status === "unavailable" && (
             <button className="primary" onClick={() => void auth.restore()}>
               重试连接
@@ -97,7 +94,7 @@ export function App() {
     </a>
   ));
   return (
-    <div className="app-shell">
+    <div className="app-shell" key={state.session.id}>
       <aside className="sidebar">
         <a href="#/inbox" className="wordmark">
           SIMLink
@@ -114,13 +111,13 @@ export function App() {
       {page === "devices" && <DevicesPage api={auth.api} />}
       {page === "settings" && (
         <main className="main live-page">
-          <h1>设置</h1>
+          <PageBrand /><div className="title-row"><h1>设置</h1></div>
           <PwaSettings />
           <section className="live-card">
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>
             <p className="field-help">
-              当前短信持续保留，尚未提供自动清理。阅读状态已支持跨浏览器同步；远程发送需手机升级并主动启用，通知推送仍在开发中。
+              近期短信、设备和发件记录会缓存在此浏览器，退出登录后清除。远程发送需在手机主动启用。
             </p>
             <button
               className="secondary"

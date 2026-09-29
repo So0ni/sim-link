@@ -1,6 +1,8 @@
+import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
+import { PageBrand } from "../../shared/ui/PageBrand.tsx";
 import { SimEditor } from "../sims/SimEditor.tsx";
 import { listSims, type Sim } from "../sims/api.ts";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { pairingPayload } from "./pairing.ts";
 import { errorText, type ApiClient } from "../../shared/api/client.ts";
@@ -14,41 +16,41 @@ import {
   type Pairing,
 } from "./api.ts";
 export function DevicesPage({ api }: { api: ApiClient }) {
-  const [sims, setSims] = useState<Sim[]>([]);
-  const [recoverable, setRecoverable] = useState<Pick<Device, "id" | "name">[]>([]);
+  const cached=api.views.get<{sims:Sim[];devices:Device[];recoverable:Pick<Device,"id"|"name">[];updatedAt:number}>("devices");
+  const [sims, setSims] = useState<Sim[]>(cached?.sims??[]);
+  const [recoverable, setRecoverable] = useState<Pick<Device, "id" | "name">[]>(cached?.recoverable??[]);
   const [pairingTarget, setPairingTarget] = useState("");
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<Device[]>(cached?.devices??[]);
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    Promise.all([listDevices(api, controller.signal), listSims(api, controller.signal), listRecoverableDevices(api, controller.signal)])
-      .then(([result, inventory, retired]) => {
-        if (!controller.signal.aborted) {
-          setDevices(result.devices);
-          setSims(inventory.sims);
-          setRecoverable(retired.devices);
-          setError("");
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) setError(errorText(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [api, reload]);
-  useEffect(() => {
-    const timer = setInterval(() => { if (document.visibilityState === "visible") setReload(v => v + 1); }, 30000);
-    const refresh = () => { if (document.visibilityState === "visible") setReload(v => v + 1); };
-    document.addEventListener("visibilitychange", refresh);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
-  }, []);
+  const [updatedAt,setUpdatedAt]=useState<number|null>(cached?.updatedAt??null);
+  const active=useRef<AbortController|null>(null);
+  const pending=useRef<Promise<void>|null>(null);
+  const refresh=useCallback(():Promise<void>=>{
+    if(pending.current)return pending.current;
+    const controller=new AbortController();active.current=controller;setLoading(true);
+    const task=Promise.all([listDevices(api,controller.signal),listSims(api,controller.signal),listRecoverableDevices(api,controller.signal)])
+      .then(([result,inventory,retired])=>{
+        if(controller.signal.aborted)return;
+        const stamp=Date.now();setDevices(result.devices);setSims(inventory.sims);setRecoverable(retired.devices);setUpdatedAt(stamp);setError("");
+        api.views.set("devices",{devices:result.devices,sims:inventory.sims,recoverable:retired.devices,updatedAt:stamp});
+      }).catch(err=>{if(!controller.signal.aborted)setError(errorText(err));})
+      .finally(()=>{if(active.current===controller){active.current=null;if(!controller.signal.aborted)setLoading(false);}if(pending.current===task)pending.current=null;});
+    pending.current=task;return task;
+  },[api]);
+  useEffect(()=>{
+    void refresh();
+    return ()=>{active.current?.abort();active.current=null;pending.current=null;};
+  },[refresh,reload]);
+  useEffect(()=>{
+    const wake=()=>{if(document.visibilityState==='visible'&&navigator.onLine)void refresh();};
+    const timer=setInterval(wake,30000);
+    document.addEventListener('visibilitychange',wake);window.addEventListener('online',wake);
+    return ()=>{clearInterval(timer);document.removeEventListener('visibilitychange',wake);window.removeEventListener('online',wake);};
+  },[refresh]);
   useEffect(() => {
     if (!pairing) return;
     const timer = setTimeout(
@@ -66,12 +68,13 @@ export function DevicesPage({ api }: { api: ApiClient }) {
   }
   return (
     <main className="main live-page">
+      <PageBrand />
       <div className="title-row">
         <h1>设备</h1>
-        <button disabled={loading} onClick={() => setReload((v) => v + 1)}>
-          刷新
-        </button>
+        <RefreshButton label="刷新设备" onRefresh={refresh}/>
+
       </div>
+      <p className="field-help refresh-time">{updatedAt ? `刷新于 ${new Date(updatedAt).toLocaleTimeString()}` : "尚未刷新"}</p>
       <p className="muted">将 Android 设备连接到这台服务器。</p>
       <section className="live-card">
         <h2>添加设备</h2>
@@ -119,7 +122,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
       <section className="live-card">
         <h2>已配对设备</h2>
         <p className="field-help">状态按服务器最近联系时间判断。后台省电可能延迟心跳，离线不代表手机已关机。</p>
-        {loading ? (
+        {loading && !updatedAt ? (
           <p role="status">正在加载…</p>
         ) : (
           !devices.length && <p>还没有已配对设备。</p>
@@ -129,7 +132,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
             <div>
               <strong>{device.name}</strong>
               <p className="field-help">
-                {device.presence === "online" ? "在线 · 最近有联系" : device.presence === "offline" ? "离线 · 超过 35 分钟未联系" : "等待首次联系"}
+                {device.lastSeenAt != null && Date.now()-device.lastSeenAt <= 35*60*1000 ? "在线 · 最近有联系" : device.lastSeenAt != null ? "离线 · 超过 35 分钟未联系" : "等待首次联系"}
               </p>
               <p className="field-help">最近联系：{device.lastSeenAt == null ? "暂无记录" : new Date(device.lastSeenAt).toLocaleString()}</p>
               <p className="field-help">设备编号 {device.id.slice(0, 8)}</p>

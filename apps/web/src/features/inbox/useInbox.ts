@@ -5,11 +5,12 @@ import { ForegroundPoller } from "../../shared/api/polling.ts";
 import { listSims, type Sim } from "../sims/api.ts";
 import { applyReading, mergeReading, mergeMessages } from "./model.ts";
 export function useInbox(api: ApiClient) {
-  const [sims, setSims] = useState<Sim[]>([]);
-  const [messages, setMessages] = useState<ReceivedMessage[]>([]);
+  const cached=api.views.get<{sims:Sim[];messages:ReceivedMessage[];updatedAt:number}>("inbox");
+  const [sims, setSims] = useState<Sim[]>(cached?.sims??[]);
+  const [messages, setMessages] = useState<ReceivedMessage[]>(cached?.messages??[]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
-  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(cached?.updatedAt??null);
   const [readingError, setReadingError] = useState("");
   const [readingBusy, setReadingBusy] = useState(false);
   const states = useRef(new Map<number, ReadingState>());
@@ -48,8 +49,10 @@ export function useInbox(api: ApiClient) {
   }, [api, acceptStates]);
   const cursor = useRef("0");
   const active = useRef<AbortController | null>(null);
-  const refresh = useCallback(async () => {
-    if (active.current) return true;
+  const pending = useRef<Promise<boolean> | null>(null);
+  const refresh = useCallback(():Promise<boolean> => {
+    if (pending.current) return pending.current;
+    const run = async () => {
     const controller = new AbortController();
     active.current = controller;
     setBusy(true);
@@ -84,7 +87,14 @@ export function useInbox(api: ApiClient) {
         if (!controller.signal.aborted) setBusy(false);
       }
     }
+    };
+    const task=run(); pending.current=task;
+    void task.finally(()=>{if(pending.current===task)pending.current=null;});
+    return task;
   }, [api, acceptStates]);
+  useEffect(() => {
+    if(updatedAt)api.views.set("inbox",{sims,messages,updatedAt});
+  },[api,sims,messages,updatedAt]);
   useEffect(() => {
     const poller = new ForegroundPoller(refresh, () => document.visibilityState === "visible" && navigator.onLine);
     poller.start();
@@ -100,6 +110,7 @@ export function useInbox(api: ApiClient) {
       writing.current = null;
       active.current?.abort();
       active.current = null;
+      pending.current = null;
     };
   }, [refresh]);
   return { markReading, readingBusy, readingError, messages, sims, error, busy, updatedAt, refresh };
