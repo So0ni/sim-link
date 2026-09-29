@@ -6,7 +6,7 @@ function cursorValue(value) {
 }
 const readingColumns = "sequence, is_read AS isRead, read_version AS readVersion";
 const reading = row => ({ ...row, isRead: Boolean(row.isRead) });
-export function createInboxService(db, now) {
+export function createInboxService(db, now, enqueueNotification = () => {}) {
   const updateReading = db.transaction(({ messages, isRead }) => {
     if (new Set(messages.map(m => m.sequence)).size !== messages.length) fail(400, "duplicate_sequence");
     const rows = messages.map(m => db.prepare(`SELECT ${readingColumns} FROM messages WHERE sequence=?`).get(m.sequence));
@@ -63,6 +63,7 @@ export function createInboxService(db, now) {
         stamp,
         body.simKey ?? null,
       );
+    enqueueNotification(Number(result.lastInsertRowid), dev.id, body);
     return {
       eventId: body.eventId,
       sequence: Number(result.lastInsertRowid),

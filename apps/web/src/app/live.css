@@ -188,3 +188,6 @@
 .inbox-list .conversation-row .row-content p { font-weight:400; }
 .inbox-list .conversation-row.is-unread .row-heading strong { font-weight:700; }
 .inbox-list .conversation-row.is-unread .row-content p { font-weight:600; color:var(--textPrimary); }
+
+.push-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.push-actions button { min-height: 48px; }

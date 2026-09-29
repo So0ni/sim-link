@@ -154,3 +154,7 @@ status 为 available / permission_required / unavailable；后两者 sims 必须
 状态：pending等待手机；claimed只证明领取；领取后120秒无结果投影为unknown。pending超时为cancelled、reason=expired，后台每30秒清理，读取/领取时也检查截止时间，claimed不因过期冒充“未发送”。全部分段成功为sent，无送达报告；全部明确失败为failed，成功与失败混合为partial，其余为unknown；cancelled和rejected均表示未发送。既有任务保留原expiresAt，不延长历史任务；既有expired仍可读。过期检查同时在服务端领取与Android蜂窝提交前执行；Android以响应serverTime计算剩余时间，减去完整请求耗时与本机单调时钟经过时间，不依赖手机墙上时钟。
 
 Android先持久化领取游标，再领取；收到命令后在同一事务保留不可重入执行记录并推进游标，随后校验配对、权限、逻辑SIM与有效期。每个分段先落盘再调用SmsManager。已有执行记录绝不再次调用蜂窝发送；重启只补报已存分段，没有本地发送记录的执行中断记拒绝。网络重传的是命令/回执，不是短信。不能承诺蜂窝exactly-once。
+
+## Web Push（2026-09-29）
+
+新增管理员会话 `/api/v1/push` 接口，订阅归属当前会话，写操作使用现有 Origin/CSRF 策略；Android 协议不变。字段、限流、状态与兼容边界见 [Web Push 接口](WEB-PUSH.md#接口)。

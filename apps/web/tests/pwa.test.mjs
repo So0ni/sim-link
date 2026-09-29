@@ -102,3 +102,19 @@ test('first activation is silent; a waiting update prompts and controller replac
   assert.equal(pwa.snapshot().update,true);pwa.activate();assert.equal(accepted,true);
   serviceWorker.dispatchEvent(new Event('controllerchange'));serviceWorker.dispatchEvent(new Event('controllerchange'));assert.equal(reloads,1);
 });
+
+test('push shows sender only for the bound live session; offline fallback is private; safe click deep links',async()=>{
+  const events={},shown=[],opened=[];let response={ok:true,status:200,json:async()=>({id:'session'})};
+  const context={URL,Set,AbortSignal,self:{location:{origin:'https://sim.test'},addEventListener:(type,fn)=>events[type]=fn,
+    registration:{showNotification:async(...args)=>shown.push(args)},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}},
+    fetch:async()=>{if(response instanceof Error)throw response;return response;}};
+  vm.runInNewContext(source.replace('__BUILD_ID__','test').replace('__PRECACHE__','[]'),context);
+  async function fire(type,data){let promise;events[type]({...data,waitUntil:p=>promise=p});await promise;}
+  const payload={sessionId:'session',body:'+12025550123 发来一条短信',url:'/#/inbox/test-conversation',tag:'message:1'};
+  await fire('push',{data:{json:()=>payload}});assert.equal(shown[0][1].body,payload.body);assert.equal(shown[0][1].data.url,payload.url);
+  response={ok:false,status:401};await fire('push',{data:{json:()=>payload}});assert.equal(shown.length,1);
+  response={ok:true,status:200,json:async()=>({id:'different'})};await fire('push',{data:{json:()=>payload}});assert.equal(shown.length,1);
+  response=new Error('offline');await fire('push',{data:{json:()=>payload}});assert.ok(!shown[1][1].body.includes('12025550123'));assert.equal(shown[1][1].data.url,'/#/inbox');
+  await fire('notificationclick',{notification:{close(){},data:{url:payload.url}}});assert.equal(opened[0],'https://sim.test'+payload.url);
+  for(const url of ['https://evil.test/','/api/v1/auth/logout','/#/send'])await fire('notificationclick',{notification:{close(){},data:{url}}});assert.equal(opened.length,1);
+});

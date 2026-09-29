@@ -11,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 6) {
+  if (version > 7) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -87,6 +87,19 @@ export function openStore(path) {
         reason TEXT,parts TEXT,interrupted INTEGER NOT NULL DEFAULT 0,UNIQUE(device_id,claim_request_id));
       CREATE INDEX commands_pending ON commands(device_id,state,created_at);
       PRAGMA user_version=6;
+    `);
+  })();
+  if (version < 7) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE push_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), public_key TEXT NOT NULL, private_key TEXT NOT NULL);
+      CREATE TABLE push_subscriptions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        endpoint TEXT UNIQUE NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE push_jobs (id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL REFERENCES push_subscriptions(id) ON DELETE CASCADE,
+        event_key TEXT NOT NULL, url TEXT NOT NULL, sender TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+        state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL,
+        last_at INTEGER, result TEXT, UNIQUE(subscription_id,event_key));
+      CREATE INDEX push_jobs_due ON push_jobs(state,next_at);
+      PRAGMA user_version=7;
     `);
   })();
   return db;

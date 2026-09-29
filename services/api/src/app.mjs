@@ -1,3 +1,5 @@
+import { createPushService } from './modules/push/service.mjs';
+import { registerPushRoutes } from './modules/push/routes.mjs';
 import Fastify from "fastify";
 import { resolve, join } from "node:path";
 import { accessSync } from "node:fs";
@@ -26,6 +28,7 @@ export function createApp({
   insecureHttp = false,
   webRoot,
   now = Date.now,
+  pushSender,
 } = {}) {
   const url = new URL(origin);
   if (url.origin !== origin || url.username || url.password)
@@ -53,25 +56,30 @@ export function createApp({
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
   });
   app.decorate("store", db);
-  app.addHook("onClose", async () => db.close());
+
   configureHttp(app, staticRoot);
   const auth = createAuthService(db, now);
+  const push = createPushService(db, now, origin, pushSender);
   const dependencies = {
+    push,
     auth,
     sessions: createSessionPolicy(auth, origin),
     rate: createRateLimit(db, now),
     devices: createDeviceService(db, now, origin),
-    inbox: createInboxService(db, now),
+    inbox: createInboxService(db, now, push.enqueueMessage),
     sims: createSimService(db, now),
     commands: createCommandService(db, now),
   };
-  let expiryTimer;
+  let expiryTimer, pushTimer;
   app.addHook("onReady", async () => {
     dependencies.commands.expire();
     expiryTimer = setInterval(() => dependencies.commands.expire(), 30000);
     expiryTimer.unref();
+    pushTimer = setInterval(() => { void push.drain().catch(() => app.log.error('Push queue processing failed')); }, 5000);
+    pushTimer.unref();
   });
-  app.addHook("onClose", async () => clearInterval(expiryTimer));
+  app.addHook("onClose", async () => { clearInterval(expiryTimer); clearInterval(pushTimer); await push.stop(); db.close(); });
+  registerPushRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);
   registerDeviceRoutes(app, dependencies);
   registerInboxRoutes(app, dependencies);

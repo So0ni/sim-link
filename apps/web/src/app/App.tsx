@@ -1,3 +1,4 @@
+import { PushSettings } from '../features/push/PushSettings.tsx';
 import { PageBrand } from "../shared/ui/PageBrand.tsx";
 import { VIEW_CACHE_KEY } from "../shared/api/viewCache.ts";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -112,6 +113,7 @@ export function App() {
       {page === "settings" && (
         <main className="main live-page">
           <PageBrand /><div className="title-row"><h1>设置</h1></div>
+          <PushSettings api={auth.api} />
           <PwaSettings />
           <section className="live-card">
             <h2>登录与数据</h2>
