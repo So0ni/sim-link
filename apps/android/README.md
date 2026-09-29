@@ -6,7 +6,7 @@ Android 14+ 原生 Kotlin 网关。已有本地短信收发实验，并加入扫
 
 - minSdk 34（Android 14）；compileSdk / targetSdk 37。
 - Android Gradle Plugin 9.2.1，自带 Kotlin；Gradle Wrapper 9.4.1（分发文件 SHA-256 已固定）。
-- SDK Build Tools 36.0.0；Java 源码目标 17。已用 Android Studio 自带 JBR 25 构建。
+- SDK 平台安装包名为 `platforms;android-37.0`（Gradle 中仍为 `compileSdk = 37`）；SDK Build Tools 36.0.0；Java 源码目标 17。已用 Android Studio 自带 JBR 25 构建。
 - 本机 SDK 路径写在被忽略的 `local.properties`，其他开发者自行配置 `sdk.dir`，或设置 `ANDROID_HOME`。
 
 使用 Android Studio 打开本目录，等待同步。命令行需要将 `JAVA_HOME` 指向已安装的 JDK；例如本机 Android Studio 位于用户 Applications 目录：
