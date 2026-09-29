@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { errorText, type ApiClient } from "../../shared/api/client.ts";
-import { simTitle, updateSim, type Sim } from "./api.ts";
+import { updateSim, type Sim } from "./api.ts";
 
 export function SimEditor({ sim, api, saved }: { sim: Sim; api: ApiClient; saved: () => void }) {
   const [editing, setEditing] = useState(false);
@@ -9,10 +9,14 @@ export function SimEditor({ sim, api, saved }: { sim: Sim; api: ApiClient; saved
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return <div className="sim-editor">
-    <strong>{simTitle(sim)}</strong>
-    <p className="field-help">卡槽 {sim.slotIndex + 1} · {sim.carrier || "运营商未知"} · {
-      sim.state === "active" ? "最近上报在用" : sim.state === "inactive" ? "已不在当前清单" : sim.state === "detached" ? "设备已解绑" : "当前状态未知"
-    }</p>
+    <div className="sim-summary">
+      <span className="sim-slot">卡槽 {sim.slotIndex + 1}</span>
+      <div className="sim-identity"><strong>{sim.name || sim.carrier || "未命名 SIM"}</strong>
+        <p>{[sim.phoneNumber,sim.name?sim.carrier:''].filter(Boolean).join(' · ') || '未填写号码'}</p>
+        {sim.state!=='active'&&<span className="sim-state">{sim.state==='inactive'?'已不在当前清单':sim.state==='detached'?'设备已解绑':'状态未知'}</span>}
+      </div>
+      {!editing&&<button className="sim-edit-button" aria-label={`编辑卡槽 ${sim.slotIndex+1} 的名称与号码`} onClick={()=>{setName(sim.name);setPhone(sim.phoneNumber);setError('');setEditing(true);}}>编辑</button>}
+    </div>
     {editing ? <form className="live-form" onSubmit={async e => {
       e.preventDefault();
       const normalized = phone.replace(/[ ()-]/g, "");
@@ -30,6 +34,6 @@ export function SimEditor({ sim, api, saved }: { sim: Sim; api: ApiClient; saved
       <div className="sim-actions"><button type="submit" className="primary" disabled={busy}>{busy ? "保存中…" : "保存"}</button>
         <button type="button" disabled={busy} onClick={() => { setEditing(false); setError(""); }}>取消</button></div>
       {error && <p className="live-error" role="alert">{error}</p>}
-    </form> : <button onClick={() => { setName(sim.name); setPhone(sim.phoneNumber); setEditing(true); }}>设置名称与号码</button>}
+    </form> : null}
   </div>;
 }

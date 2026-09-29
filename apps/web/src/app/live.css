@@ -137,3 +137,48 @@
 @media (max-width:799px) { .send-content > .mobile-brand { margin-bottom:-20px; } }
 
 .live-page > .title-row { min-height:48px; }
+
+/* A device owns its SIM rows; management stays secondary. */
+.devices-page > .title-row, .devices-page > .refresh-time, .paired-devices, .devices-page > .live-card { max-width:760px; }
+.paired-devices { margin-top:24px; display:grid; gap:16px; }
+.paired-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.paired-heading span { color:var(--textSecondary); font-size:13px; }
+.device-card { border:1px solid var(--borderControl); border-radius:16px; padding:20px; min-width:0; }
+.device-card-heading { display:flex; align-items:flex-start; gap:12px; }
+.device-icon { flex:0 0 40px; height:40px; display:grid; place-items:center; background:var(--surfaceSelected); color:var(--primary); border-radius:10px; }
+.device-identity { flex:1; min-width:0; }
+.device-identity h3 { font-size:17px; line-height:24px; overflow-wrap:anywhere; }
+.device-identity p { font-size:12px; color:var(--textSecondary); margin-top:4px; line-height:18px; }
+.device-presence { flex-shrink:0; font-size:12px; line-height:24px; color:var(--textSecondary); }
+.device-presence.is-online { color:var(--successText); }
+.device-sims { margin-top:16px; padding-top:12px; border-top:1px solid var(--borderSubtle); }
+.device-sims-label { font-size:12px; font-weight:600; color:var(--textSecondary); }
+.device-sims-label span { font-weight:400; color:var(--textMuted); }
+.device-card .sim-editor { margin:0; padding:8px 0; border:0; }
+.device-card .sim-editor + .sim-editor { border-top:1px solid var(--borderSubtle); }
+.sim-summary { display:flex; align-items:center; gap:12px; min-width:0; }
+.sim-slot { flex-shrink:0; padding:4px 6px; background:var(--surfaceSelected); border-radius:6px; color:var(--textSecondary); font-size:12px; }
+.sim-identity { flex:1; min-width:0; }
+.sim-identity strong { display:block; font-size:14px; line-height:22px; overflow-wrap:anywhere; }
+.sim-identity p, .sim-state { font-size:12px; line-height:18px; color:var(--textSecondary); overflow-wrap:anywhere; }
+.sim-edit-button { flex-shrink:0; min-width:44px; min-height:44px; padding:8px; font-size:13px; color:var(--primary); background:transparent; }
+.device-card .live-form { margin-top:12px; }
+.device-management { margin-top:4px; border-top:1px solid var(--borderSubtle); padding-top:4px; }
+.device-management > summary, .historical-sims > summary { min-height:44px; display:list-item; align-content:center; cursor:pointer; font-size:13px; color:var(--textSecondary); }
+.device-management dl { margin:8px 0 12px; font-size:12px; }
+.device-management dl > div { display:grid; grid-template-columns:90px 1fr; gap:8px; margin-top:8px; }
+.device-management dt { color:var(--textSecondary); }
+.device-management dd { margin:0; overflow-wrap:anywhere; }
+.device-management-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; }
+.device-management-actions button { min-height:44px; padding:8px 12px; font-size:13px; }
+.device-management-actions .device-unpair { color:var(--dangerText); }
+.device-notice { padding:12px 0; font-size:13px; color:var(--textSecondary); }
+.device-add { display:block; }
+.device-add > summary { cursor:pointer; min-height:44px; align-content:center; font-size:16px; font-weight:600; }
+.device-add[open] > p, .device-add[open] > button, .device-add[open] > .live-form { margin-top:16px; }
+@media(max-width:479px) {
+  .device-card { padding:16px; }
+  .device-card-heading { flex-wrap:wrap; gap:8px; }
+  .device-presence { margin-left:auto; }
+  .sim-summary { gap:8px; }
+}
