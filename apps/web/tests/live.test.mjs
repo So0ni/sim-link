@@ -102,3 +102,59 @@ test("inbox groups by device and subscription, deduplicates replay and orders by
     [4, 1],
   );
 });
+
+
+test("QR contains only versioned temporary pairing fields", async () => {
+  const { pairingPayload } = await import("../src/features/devices/pairing.ts");
+  const data = JSON.parse(pairingPayload({ server: "https://sim.example.com", pairingToken: "a".repeat(43), expiresAt: 2000, apiVersion: 1, deviceToken: "must-not-appear" }));
+  assert.deepEqual(data, { type: "simlink.pairing", version: 1, server: "https://sim.example.com", pairingToken: "a".repeat(43), expiresAt: 2000, apiVersion: 1 });
+});
+
+test("foreground revalidation keeps inbox mounted on transient failure but exits on 401", async () => {
+  const api = new ApiClient(); const auth = new SessionController(api);
+  api.request = async path => path === '/auth/session' ? session : {};
+  await auth.restore();
+  const states = []; auth.subscribe(() => states.push(auth.snapshot().status));
+  api.request = async () => { throw new Error('offline'); };
+  await auth.restore();
+  assert.equal(auth.snapshot().status,'ready'); assert.ok(!states.includes('restoring'));
+  api.request = async () => { api.onUnauthorized(); throw new Error('401'); };
+  await auth.restore(); assert.equal(auth.snapshot().status,'guest');
+});
+const settle = () => new Promise(resolve => setImmediate(resolve));
+function fakeClock() {
+  let id = 0; const pending = new Map();
+  return {
+    pending,
+    schedule: (fn, delay) => { pending.set(++id,{fn,delay}); return id; },
+    cancel: handle => pending.delete(handle),
+    fire: () => { const [handle, value] = pending.entries().next().value; pending.delete(handle); value.fn(); },
+  };
+}
+test("poller is serial, sleeps while hidden and wakes on foreground", async () => {
+  const { ForegroundPoller } = await import('../src/shared/api/polling.ts');
+  const clock = fakeClock(); let visible = true, calls = 0, resolve;
+  const poller = new ForegroundPoller(() => { calls++; return new Promise(r => resolve = r); }, () => visible, clock.schedule, clock.cancel);
+  poller.start(); poller.wake(); poller.wake(); assert.equal(calls,1);
+  resolve(true); await settle(); assert.equal([...clock.pending.values()][0].delay,5000);
+  visible = false; poller.wake(); assert.equal(clock.pending.size,0);
+  visible = true; poller.wake(); assert.equal(calls,2);
+  poller.stop(); resolve(true); await settle(); assert.equal(clock.pending.size,0);
+});
+test("poller backs off failures, resets on success and safely restarts pending work", async () => {
+  const { ForegroundPoller } = await import('../src/shared/api/polling.ts');
+  const clock = fakeClock(); let success = false;
+  const poller = new ForegroundPoller(async () => success, () => true, clock.schedule, clock.cancel);
+  poller.start(); await settle();
+  for (const delay of [10000,20000,40000,60000,60000]) {
+    assert.equal([...clock.pending.values()][0].delay,delay); clock.fire(); await settle();
+  }
+  success = true; clock.fire(); await settle(); assert.equal([...clock.pending.values()][0].delay,5000);
+  poller.stop(); assert.equal(clock.pending.size,0);
+  poller.start(); await settle(); assert.equal([...clock.pending.values()][0].delay,5000); poller.stop();
+  let release; let calls = 0;
+  const restarted = new ForegroundPoller(() => { calls++; return new Promise(r => release = r); }, () => true,clock.schedule,clock.cancel);
+  restarted.start(); restarted.stop(); restarted.start();
+  release(true); await settle(); assert.equal(calls,2);
+  restarted.stop(); release(true); await settle(); assert.equal(clock.pending.size,0);
+});

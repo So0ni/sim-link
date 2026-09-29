@@ -5,6 +5,7 @@ const app = createApp({
   webRoot: process.env.WEB_ROOT,
   origin: process.env.PUBLIC_ORIGIN ?? "https://localhost",
   insecureLocal: process.env.ALLOW_INSECURE_LOCAL === "1",
+  insecureHttp: process.env.ALLOW_INSECURE_HTTP === "1",
 });
 const close = async () => {
   await app.close();

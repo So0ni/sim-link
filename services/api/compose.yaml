@@ -9,8 +9,9 @@ services:
     environment:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Set PUBLIC_ORIGIN in .env}
       ALLOW_INSECURE_LOCAL: ${ALLOW_INSECURE_LOCAL:-0}
+      ALLOW_INSECURE_HTTP: ${ALLOW_INSECURE_HTTP:-0}
     ports:
-      - "127.0.0.1:${SIMLINK_PORT:-8787}:8787"
+      - "${SIMLINK_BIND:-127.0.0.1}:${SIMLINK_PORT:-8787}:8787"
     volumes:
       - simlink-data:/data
     read_only: true

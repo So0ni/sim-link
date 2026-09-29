@@ -65,3 +65,6 @@
     padding: 20px;
   }
 }
+
+.pairing-qr { background: white; width: fit-content; max-width: 100%; border-radius: 12px; }
+.pairing-qr svg { display: block; max-width: 100%; height: auto; }

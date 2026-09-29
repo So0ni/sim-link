@@ -30,7 +30,9 @@ export class SessionController {
   }
   async restore() {
     const epoch = ++this.epoch;
-    this.set({ status: "restoring" });
+    const previous = this.current;
+    // Foreground revalidation should keep the inbox mounted, including its cursor and selection.
+    if (previous.status !== "ready") this.set({ status: "restoring" });
     try {
       const session = await this.api.request<Session>("/auth/session");
       if (epoch !== this.epoch) return;
@@ -39,7 +41,7 @@ export class SessionController {
       if (epoch === this.epoch) this.set({ status: "ready", session });
     } catch {
       // A 401 has already transitioned to guest. Network failures preserve the server cookie.
-      if (epoch === this.epoch) this.set({ status: "unavailable" });
+      if (epoch === this.epoch) this.set(previous.status === "ready" ? previous : { status: "unavailable" });
     }
   }
   async login(password: string) {

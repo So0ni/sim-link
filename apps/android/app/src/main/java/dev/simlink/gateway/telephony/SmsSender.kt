@@ -1,4 +1,7 @@
-package dev.simlink.gateway
+package dev.simlink.gateway.telephony
+
+import dev.simlink.gateway.SentReceiver
+import dev.simlink.gateway.data.MessageStore
 
 import android.Manifest
 import android.app.PendingIntent

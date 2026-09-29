@@ -70,7 +70,7 @@ export function InboxPage({
           </div>
           {inbox.error && (
             <p className="live-error" role="alert">
-              {inbox.error}{" "}
+              {inbox.error} 已加载的短信仍可查看，连接恢复后会自动重试。{" "}
               <button onClick={() => void inbox.refresh()}>重试</button>
             </p>
           )}
@@ -114,7 +114,7 @@ export function InboxPage({
             );
           })}
         </div>
-        <p className="list-footnote">收件视图 · 阅读状态与远程发送尚未启用</p>
+        <p className="list-footnote">页面打开时每 5 秒自动检查新短信 · 可点击右上角刷新</p>
       </section>
       <section className="detail-pane" aria-label="短信详情">
         {active ? (

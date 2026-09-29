@@ -4,7 +4,7 @@
 
 ## 实现边界
 
-采用 Node.js ESM、Fastify 和 better-sqlite3 / SQLite 单体服务；容器使用 Node.js 24，精确依赖见 package-lock.json。接口、迁移与可恢复持久状态优先，不无故引入中间件。PWA 已接入，Android 尚未上传；不能把服务端测试当成真机闭环完成。按 modules/auth、devices、inbox 划分业务，routes 不直接操作 SQL，service 拥有功能事务，platform 不反向依赖业务模块。详见 docs/ARCHITECTURE.md。
+采用 Node.js ESM、Fastify 和 better-sqlite3 / SQLite 单体服务；容器使用 Node.js 24，精确依赖见 package-lock.json。接口、迁移与可恢复持久状态优先，不无故引入中间件。不能把服务端测试当成真机闭环完成；当前验收证据见 ../../docs/P1-ACCEPTANCE.md。按 modules/auth、devices、inbox 划分业务，routes 不直接操作 SQL，service 拥有功能事务，platform 不反向依赖业务模块。详见 docs/ARCHITECTURE.md。
 
 ## 认证与数据
 

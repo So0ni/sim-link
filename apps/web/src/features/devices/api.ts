@@ -4,6 +4,9 @@ export type Device = {
   name: string;
   createdAt: number;
   revokedAt: number | null;
+  lastSeenAt?: number | null;
+  presence?: "online" | "offline" | "unknown";
+  serverTime?: number;
 };
 export type Pairing = {
   pairingToken: string;

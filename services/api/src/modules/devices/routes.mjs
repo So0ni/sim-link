@@ -21,6 +21,14 @@ export function registerDeviceRoutes(app, { devices, sessions, rate }) {
       return devices.pair(req.body);
     },
   );
+  const authenticatedDevice = req => devices.authenticate(req.headers.authorization?.match(/^Bearer ([\w-]{43})$/)?.[1]);
+  app.post("/api/v1/device/heartbeat", { schema: { body: object({}) } }, async req => {
+    return devices.heartbeat(authenticatedDevice(req).id);
+  });
+  app.post("/api/v1/device/unpair", { schema: { body: object({}) } }, async req => {
+    devices.revoke(authenticatedDevice(req).id);
+    return { ok: true };
+  });
   app.get("/api/v1/devices", async (req) => {
     sessions.read(req);
     return { devices: devices.list() };

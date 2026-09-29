@@ -1,0 +1,5 @@
+<resources>
+    <string name="debug_http_consent">允许内网 HTTP 调试（凭证与短信未加密传输）</string>
+    <string name="pairing_input_error">请输入设备名称和完整的 43 位一次性配对凭证。</string>
+    <string name="server_address_error">请输入服务器根地址，不包含路径、账号、查询参数。默认只接受 HTTPS。</string>
+</resources>

@@ -2,9 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
     <uses-feature android:name="android.hardware.telephony.messaging" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application android:label="@string/app_name" android:theme="@style/AppTheme"
         android:icon="@mipmap/ic_launcher" android:dataExtractionRules="@xml/data_extraction_rules"
         android:allowBackup="false" android:usesCleartextTraffic="false" android:supportsRtl="true">
@@ -17,6 +23,8 @@
         <receiver android:name=".SmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS">
             <intent-filter><action android:name="android.provider.Telephony.SMS_RECEIVED" /></intent-filter>
         </receiver>
+        <activity android:name=".ui.ConnectionActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <service android:name=".sync.UploadJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <receiver android:name=".SentReceiver" android:exported="false" />
     </application>
 </manifest>

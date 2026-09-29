@@ -116,3 +116,84 @@ test('pairing attempts are rate limited and malformed payloads rejected', async 
 test('unsafe public HTTP origin is rejected', () => {
   assert.throws(() => createApp({ origin: 'http://example.com', insecureLocal: true }), /HTTPS/);
 });
+
+test('LAN HTTP requires explicit opt-in, uses non-Secure dev cookies and still enforces Origin', async t => {
+  assert.throws(() => createApp({ origin: 'http://192.168.1.10:8787' }), /HTTPS/);
+  const lan = 'http://192.168.1.10:8787';
+  const app = createApp({ origin: lan, insecureHttp: true });
+  t.after(() => app.close());
+  await initializeAdmin(app.store, password);
+  const result = await app.inject({ method: 'POST', url: '/api/v1/auth/login', headers: { origin: lan }, payload: { password } });
+  assert.equal(result.statusCode, 200);
+  assert.match(result.headers['set-cookie'], /^simlink-local=/);
+  assert.doesNotMatch(result.headers['set-cookie'], /; Secure/);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/v1/auth/login', headers: { origin: 'http://other.test' }, payload: { password } })).statusCode, 403);
+});
+
+
+test('one-time pairing secret is not a device credential; independent device token survives invitation expiry', async t => {
+  let stamp = 1000000;
+  const { app, headers } = await fixture(t, { now: () => stamp });
+  const device = await pair(app, headers);
+  assert.notEqual(device.deviceToken, device.payload.pairingToken);
+  assert.match(device.deviceToken, /^[A-Za-z0-9_-]{43}$/);
+  const stored = app.store.prepare('SELECT token_hash FROM devices WHERE id=?').get(device.deviceId);
+  assert.notEqual(stored.token_hash, device.deviceToken);
+  const upload = token => app.inject({ method: 'POST', url: '/api/v1/device/messages', headers: { authorization: `Bearer ${token}` }, payload: event });
+  assert.equal((await upload(device.payload.pairingToken)).statusCode, 401);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/v1/device/pair', payload: device.payload })).statusCode, 400);
+  stamp += 300001;
+  assert.equal((await upload(device.deviceToken)).statusCode, 200);
+  const second = await pair(app, headers);
+  assert.notEqual(second.deviceToken, device.deviceToken);
+  await app.inject({ method: 'DELETE', url: `/api/v1/devices/${device.deviceId}`, headers });
+  assert.equal((await upload(device.deviceToken)).statusCode, 401);
+  assert.equal((await upload(second.deviceToken)).statusCode, 200);
+});
+
+test('heartbeats use server time; unpair removes device but preserves messages and invalidates credentials', async t => {
+  let stamp = 1000000;
+  const { app, headers } = await fixture(t, { now: () => stamp });
+  const device = await pair(app, headers);
+  const auth = { authorization: `Bearer ${device.deviceToken}` };
+  const list = async () => (await app.inject({ url: '/api/v1/devices', headers })).json().devices;
+  assert.equal((await list())[0].presence, 'unknown');
+  assert.equal((await app.inject({ method:'POST',url:'/api/v1/device/heartbeat',payload:{} })).statusCode,401);
+  const beat = () => app.inject({ method:'POST',url:'/api/v1/device/heartbeat',headers:auth,payload:{} });
+  assert.equal((await beat()).json().receivedAt,stamp);
+  assert.equal((await list())[0].presence,'online');
+  stamp += 35 * 60000 + 1;
+  assert.equal((await list())[0].presence,'offline');
+  await beat();
+  assert.equal((await list())[0].presence,'online');
+  await app.inject({method:'POST',url:'/api/v1/device/messages',headers:auth,payload:event});
+  assert.equal((await app.inject({method:'POST',url:'/api/v1/device/unpair',headers:auth,payload:{}})).statusCode,200);
+  assert.deepEqual(await list(),[]);
+  assert.equal(app.store.prepare('SELECT count(*) AS n FROM devices').get().n,0);
+  assert.equal((await beat()).statusCode,401);
+  assert.equal((await app.inject({url:'/api/v1/messages',headers})).json().messages.length,1);
+});
+
+test('v1 migration removes revoked devices without losing SMS IDs or active credentials', async t => {
+  const { default: Database } = await import('better-sqlite3');
+  const { openStore } = await import('../src/platform/store.mjs');
+  const folder = mkdtempSync(join(tmpdir(), 'simlink-migrate-'));
+  t.after(() => rmSync(folder,{recursive:true,force:true}));
+  const path = join(folder,'old.sqlite');
+  const db = new Database(path);
+  db.exec(`CREATE TABLE devices(id TEXT PRIMARY KEY,name TEXT,token_hash TEXT,created_at INTEGER,revoked_at INTEGER);
+    CREATE TABLE messages(sequence INTEGER PRIMARY KEY AUTOINCREMENT,device_id TEXT REFERENCES devices(id),event_id TEXT,sender TEXT,body TEXT,subscription_id INTEGER,received_at INTEGER,synced_at INTEGER,UNIQUE(device_id,event_id));
+    INSERT INTO devices VALUES('old','Old','hash-old',1,2),('live','Live','hash-live',1,NULL);
+    INSERT INTO messages VALUES(7,'old','event','Example','Fictional',1,1,2);
+    PRAGMA user_version=1;`);
+  db.close();
+  const migrated = openStore(path);
+  try {
+    assert.equal(migrated.pragma('user_version',{simple:true}),2);
+    assert.deepEqual(migrated.prepare('SELECT id,token_hash,last_seen_at FROM devices').all(),[{id:'live',token_hash:'hash-live',last_seen_at:null}]);
+    assert.equal(migrated.prepare('SELECT device_id FROM messages WHERE sequence=7').get().device_id,'old');
+    assert.deepEqual(migrated.pragma('foreign_key_check'),[]);
+    migrated.prepare("INSERT INTO messages(device_id,event_id,sender,body,received_at,synced_at) VALUES('live','next','Example','Fictional',1,2)").run();
+    assert.equal(migrated.prepare('SELECT MAX(sequence) AS n FROM messages').get().n,8);
+  } finally { migrated.close(); }
+});

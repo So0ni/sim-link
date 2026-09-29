@@ -1,4 +1,4 @@
-package dev.simlink.gateway
+package dev.simlink.gateway.telephony
 
 enum class SendState(val label: String) {
     PROCESSING("正在发送"), SENT("已发送 · 暂无送达报告"),

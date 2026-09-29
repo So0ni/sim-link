@@ -10,7 +10,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 1) {
+  if (version > 2) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -28,5 +28,21 @@ export function openStore(path) {
       PRAGMA user_version = 1;
     `);
     })();
+  if (version < 2) db.transaction(() => {
+    // Messages retain their immutable source ID after device credentials are removed.
+    const sequence = db.prepare("SELECT seq FROM sqlite_sequence WHERE name='messages'").get()?.seq ?? 0;
+    db.exec(`
+      ALTER TABLE devices ADD COLUMN last_seen_at INTEGER;
+      CREATE TABLE messages_v2 (sequence INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL, event_id TEXT NOT NULL,
+        sender TEXT NOT NULL, body TEXT NOT NULL, subscription_id INTEGER, received_at INTEGER NOT NULL, synced_at INTEGER NOT NULL,
+        UNIQUE(device_id, event_id));
+      INSERT INTO messages_v2 SELECT * FROM messages;
+      DROP TABLE messages;
+      ALTER TABLE messages_v2 RENAME TO messages;
+      DELETE FROM devices WHERE revoked_at IS NOT NULL;
+      PRAGMA user_version = 2;
+    `);
+    db.prepare("UPDATE sqlite_sequence SET seq=MAX(seq, ?) WHERE name='messages'").run(sequence);
+  })();
   return db;
 }

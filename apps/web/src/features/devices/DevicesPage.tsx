@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { pairingPayload } from "./pairing.ts";
 import { errorText, type ApiClient } from "../../shared/api/client.ts";
 import {
   listDevices,
@@ -33,6 +35,12 @@ export function DevicesPage({ api }: { api: ApiClient }) {
     return () => controller.abort();
   }, [api, reload]);
   useEffect(() => {
+    const timer = setInterval(() => { if (document.visibilityState === "visible") setReload(v => v + 1); }, 30000);
+    const refresh = () => { if (document.visibilityState === "visible") setReload(v => v + 1); };
+    document.addEventListener("visibilitychange", refresh);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, []);
+  useEffect(() => {
     if (!pairing) return;
     const timer = setTimeout(
       () => setPairing(null),
@@ -52,8 +60,8 @@ export function DevicesPage({ api }: { api: ApiClient }) {
       <section className="live-card">
         <h2>添加设备</h2>
         <p>
-          生成一次性配对凭证，有效期五分钟。Android
-          配对界面仍在开发中，当前可用于接口联调。
+          使用 Android 的「服务器与同步 → 扫码配对」扫描二维码。凭证有效期五分钟，
+          使用一次后失效；确认服务器后，仅上传后续新短信。
         </p>
         <button
           className="primary"
@@ -70,10 +78,14 @@ export function DevicesPage({ api }: { api: ApiClient }) {
             }
           }}
         >
-          生成配对凭证
+          生成配对二维码
         </button>
         {pairing && (
           <div className="live-form">
+            <div className="pairing-qr" role="img" aria-label="一次性设备配对二维码">
+              <QRCodeSVG value={pairingPayload(pairing)} size={256} level="M" marginSize={4} />
+            </div>
+            <p className="field-help">二维码包含服务器地址和一次性凭证，请勿分享。也可手动输入以下信息。</p>
             <label htmlFor="pair-server">服务器地址</label>
             <input id="pair-server" readOnly value={pairing.server} />
             <label htmlFor="pair-token">一次性配对凭证</label>
@@ -88,6 +100,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
       </section>
       <section className="live-card">
         <h2>已配对设备</h2>
+        <p className="field-help">状态按服务器最近联系时间判断。后台省电可能延迟心跳，离线不代表手机已关机。</p>
         {loading ? (
           <p role="status">正在加载…</p>
         ) : (
@@ -98,8 +111,9 @@ export function DevicesPage({ api }: { api: ApiClient }) {
             <div>
               <strong>{device.name}</strong>
               <p className="field-help">
-                {device.revokedAt ? "已撤销" : "已配对 · 连接状态未知"}
+                {device.presence === "online" ? "在线 · 最近有联系" : device.presence === "offline" ? "离线 · 超过 35 分钟未联系" : "等待首次联系"}
               </p>
+              <p className="field-help">最近联系：{device.lastSeenAt == null ? "暂无记录" : new Date(device.lastSeenAt).toLocaleString()}</p>
               <p className="field-help">设备编号 {device.id.slice(0, 8)}</p>
             </div>
             {!device.revokedAt && (
@@ -108,7 +122,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
                 onClick={async () => {
                   if (
                     !window.confirm(
-                      `撤销“${device.name}”？此设备将无法继续上传，已保存短信会保留。`,
+                      `解除“${device.name}”的配对并移除设备条目？凭证立即失效，已保存短信保留。`,
                     )
                   )
                     return;
@@ -123,7 +137,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
                   }
                 }}
               >
-                撤销设备
+                解除配对
               </button>
             )}
           </div>

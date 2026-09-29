@@ -10,7 +10,7 @@ export function createDeviceService(db, now, origin) {
     if (!consumed.changes) fail(400, "pairing_invalid_or_expired");
     const deviceToken = token();
     const deviceId = randomUUID();
-    db.prepare("INSERT INTO devices VALUES (?, ?, ?, ?, NULL)").run(
+    db.prepare("INSERT INTO devices(id,name,token_hash,created_at,revoked_at) VALUES (?, ?, ?, ?, NULL)").run(
       deviceId,
       body.name,
       hash(deviceToken),
@@ -44,14 +44,17 @@ export function createDeviceService(db, now, origin) {
     list() {
       return db
         .prepare(
-          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt FROM devices ORDER BY created_at",
+          "SELECT id, name, created_at AS createdAt, revoked_at AS revokedAt, last_seen_at AS lastSeenAt FROM devices WHERE revoked_at IS NULL ORDER BY created_at",
         )
-        .all();
+        .all().map(device => ({ ...device, presence: device.lastSeenAt === null ? "unknown" : now() - device.lastSeenAt <= 35 * 60 * 1000 ? "online" : "offline", serverTime: now() }));
+    },
+    heartbeat(id) {
+      const stamp = now();
+      db.prepare("UPDATE devices SET last_seen_at=? WHERE id=?").run(stamp, id);
+      return { receivedAt: stamp };
     },
     revoke(id) {
-      db.prepare(
-        "UPDATE devices SET revoked_at=? WHERE id=? AND revoked_at IS NULL",
-      ).run(now(), id);
+      db.prepare("DELETE FROM devices WHERE id=?").run(id);
     },
   };
 }

@@ -35,7 +35,11 @@ export function App() {
         void auth.restore();
     };
     document.addEventListener("visibilitychange", visible);
-    return () => document.removeEventListener("visibilitychange", visible);
+    window.addEventListener("online", visible);
+    return () => {
+      document.removeEventListener("visibilitychange", visible);
+      window.removeEventListener("online", visible);
+    };
   }, [auth]);
   if (state.status === "guest") return <LoginPage auth={auth} />;
   if (state.status !== "ready")
@@ -112,7 +116,7 @@ export function App() {
             <h2>登录与数据</h2>
             <p>此设备默认保持登录，可主动退出。</p>
             <p className="field-help">
-              当前服务器尚未启用自动清理，短信将持续保留。推送和远程发送尚未启用。
+              当前短信持续保留，尚未提供自动清理。已读状态跨设备同步、从 Web 发送短信和通知推送仍在开发中。
             </p>
             <button
               className="secondary"

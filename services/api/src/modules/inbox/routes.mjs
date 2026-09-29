@@ -24,7 +24,10 @@ export function registerInboxRoutes(app, { inbox, devices, sessions }) {
     },
     async (req) => {
       const raw = req.headers.authorization?.match(/^Bearer ([\w-]{43})$/)?.[1];
-      return inbox.receive(devices.authenticate(raw), req.body);
+      const device = devices.authenticate(raw);
+      const ack = inbox.receive(device, req.body);
+      devices.heartbeat(device.id);
+      return ack;
     },
   );
   app.get("/api/v1/messages", async (req) => {

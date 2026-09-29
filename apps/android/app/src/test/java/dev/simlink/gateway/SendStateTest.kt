@@ -1,6 +1,7 @@
 package dev.simlink.gateway
 
 import org.junit.Assert.*
+import dev.simlink.gateway.telephony.*
 import org.junit.Test
 
 class SendStateTest {

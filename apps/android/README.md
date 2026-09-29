@@ -1,6 +1,6 @@
-# SIMLink Gateway · Android P0
+# SIMLink Gateway · Android P1
 
-Android 14+ 的本地短信能力实验。Kotlin + Android 原生 View，单 application 模块；无第三方运行期框架、网络权限、后端或后台轮询服务。此工程是功能验证入口，尚不是可常驻的完整 Gateway。
+Android 14+ 原生 Kotlin 网关。已有本地短信收发实验，并加入扫码/手动配对、Keystore 凭证、持久收件队列和 JobScheduler 上传。单 application 模块；扫码采用 ZXing Embedded，连接页面采用 AndroidX Activity 接收扫描结果。模块与同步语义见 [P1 同步说明](docs/P1-SYNC.md)；P1 尚未完成真机联调。
 
 ## 工具链
 
@@ -41,9 +41,9 @@ adb -s DEVICE_SERIAL shell am start -n dev.simlink.gateway/.MainActivity
 
 只有全部分段 `RESULT_OK` 才显示已发送。部分成功与失败并存显示部分发送；缺少回调超过 2 分钟或调用边界异常显示结果未确认，晚到的完整回调可以更新状态。两分钟只是本地“未确认”展示阈值，不是运营商超时或命令过期。没有请求送达报告，所以已发送不表示已送达。
 
-应用不访问系统历史短信库、不写系统 SMS Provider、不接管默认短信角色，也不承担 MMS/RCS 或电话能力。非默认应用由系统负责 SmsManager 发件的系统库写入。本地记录不代表后端同步。
+应用不访问系统历史短信库、不写系统 SMS Provider、不接管默认短信角色，也不承担 MMS/RCS 或电话能力。非默认应用由系统负责 SmsManager 发件的系统库写入。本地记录只有收到匹配服务端 ACK 后才标为已同步。
 
-接收广播若携带订阅信息则记录；缺失时写“SIM 归属未知”，不猜默认卡。subscriptionId 仅作为 P0 当次系统证据，不能作为未来后端的永久 SIM 身份；还没有持久 SIM 映射或远程队列。
+接收广播若携带订阅信息则记录；缺失时写“SIM 归属未知”，不猜默认卡。subscriptionId 仅作为 P0 当次系统证据，不能作为未来后端的永久 SIM 身份；还没有持久 SIM 映射或远程发件队列；收件 outbox 已实现。
 
 短信内容不写日志或提交文件；本地私有数据排除云备份及设备迁移。数据库尚未加应用层加密。默认短信应用继续负责通知。草稿只在当前进程/界面状态中保存，不承诺进程被杀后恢复。
 
@@ -61,9 +61,17 @@ P0 先测非默认应用路线，避免在没有实现默认角色完整职责�
 
 本机 HyperOS OS3.0.306.0.WOPCNXM 的两次发送测试均出现额外确认框，已定位为小米安全中心 `SendSmsVerificationActivity`；`SEND_SMS` 权限和标准 AppOps 已允许。手动确认后成功发出不代表支持无人值守发件。是否存在官方持续允许配置、默认短信角色是否改变此行为均未验证，详见 [验证记录](docs/P0-VALIDATION.md)。
 
-- `./gradlew :app:testDebugUnitTest`：6 项分段状态和号码校验测试。
-- `./gradlew :app:lintDebug`：当前 0 错误；2 个建议为 Gradle 有更新版本、确认是否必须具有电话硬件。固定官方 AGP 兼容版本且本实验依赖实体 SIM，暂保留并说明。
+- `./gradlew :app:testDebugUnitTest`：16 项发送、URL/HTTP 策略、同步幂等与取消测试。
+- `./gradlew :app:lintDebug`：当前 0 错误；3 个建议为 Gradle 有更新版本、adaptive icon 的 v26 目录、确认是否必须具有电话硬件。固定官方 AGP 兼容版本且本实验依赖实体 SIM，暂保留并说明。
 - `./gradlew :app:assembleDebug`：实际生成 debug APK。
 - 真机测试按 [P0 验证表](docs/P0-VALIDATION.md) 执行，未执行的项不得标为通过。
 
 官方依据：[AGP 9.2 兼容表](https://developer.android.com/build/releases/agp-9-2-0-release-notes)、[短信广播](https://developer.android.com/reference/android/provider/Telephony.Sms.Intents)、[SmsManager](https://developer.android.com/reference/android/telephony/SmsManager)、[默认短信职责](https://developer.android.com/reference/android/provider/Telephony)。
+
+## P1 连接与同步
+
+运行/设置 → 服务器与同步。先测试地址，再输入 Web 设备页生成的一次性配对凭证并确认地址。只有配对之后新收到的入站短信自动入队；旧记录和原服务器队列不迁移。可以刷新实际队列状态、请求同步、修正问题后重试 blocked 事件或解除本机配对。解除后请到 Web 撤销服务端凭证。
+
+Debug APK 可勾选内网 HTTP 调试；Release 仍强制 HTTPS，普通证书验证不变。详细后端配置见 [后端部署说明](../../services/api/README.md)。HTTP 未加密，不把它用于公网真实数据。
+
+本轮 Debug、未签名 Release 构建和 JVM 检查通过；release APK 不是可直接安装的正式签名发行版。数据库 v2 迁移/Keystore/JobScheduler 和页面操作尚待在线真机；当前用户尚未部署后端。

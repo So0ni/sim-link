@@ -21,4 +21,11 @@
 
 共享颜色、字号层级和状态语义，使用 Android 原生返回、权限控件与安全区。常规触控至少 48dp，文字使用 sp；不把 PWA 管理后台嵌入 WebView 代替原生配置体验。
 
-当前为 P0 本地能力实验：Kotlin 原生 View，minSdk 34、compileSdk/targetSdk 37，固定工具链见 [README](README.md)。使用仓库内 Wrapper：`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug`；JDK/SDK 配置、安装和真机验证见 README。P0 暂不接管默认短信角色，不得把它描述为角色路线已通过。单元测试可验证状态与队列，模拟器可验证 UI；真实 SMS、双卡、锁屏、重启、省电和厂商行为必须标明真机型号、系统及测试结果。没有真机不伪造验证通过，真实联调使用用户指定测试卡和号码。
+当前为 P1 收件同步实现，P0 收发行为保留：Kotlin 原生 View，minSdk 34、compileSdk/targetSdk 37，固定工具链见 [README](README.md)。使用仓库内 Wrapper：`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug`；JDK/SDK 配置、安装和真机验证见 README。P0 暂不接管默认短信角色，不得把它描述为角色路线已通过。单元测试可验证状态与队列，模拟器可验证 UI；真实 SMS、双卡、锁屏、重启、省电和厂商行为必须标明真机型号、系统及测试结果。没有真机不伪造验证通过，真实联调使用用户指定测试卡和号码。
+
+
+## P1 工程边界
+
+按 ui / connection / sync / telephony / data / platform 分包，详见 [同步架构](docs/P1-SYNC.md)。SyncEngine 必须可在 JVM 独立测试；UI/receiver 不直接执行上传，网络任务不得占用 LocalIo 收件执行器。保留根包旧组件名薄适配，避免升级破坏 launcher 与已有回执 PendingIntent。
+
+同一事务保存新收件和 outbox，事件绑定配对 generation，重新配对不迁移旧队列。仅匹配 ACK 后标记同步；上传重试不等于重发实体短信。Debug 可显式允许内网 HTTP，Release 仍为 HTTPS，禁止证书绕过。真机测试前先让用户确认服务器地址和上传范围。

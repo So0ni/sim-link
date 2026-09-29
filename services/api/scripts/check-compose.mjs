@@ -7,7 +7,7 @@ const cwd = fileURLToPath(new URL('..', import.meta.url));
 const project = `simlink-check-${process.pid}`;
 const port = process.env.SIMLINK_TEST_PORT ?? '18788';
 const origin = `http://localhost:${port}`;
-const env = { ...process.env, PUBLIC_ORIGIN: origin, ALLOW_INSECURE_LOCAL: '1', SIMLINK_PORT: port };
+const env = { ...process.env, PUBLIC_ORIGIN: origin, ALLOW_INSECURE_LOCAL: '1', ALLOW_INSECURE_HTTP: '0', SIMLINK_BIND: '127.0.0.1', SIMLINK_PORT: port };
 function compose(args, input) {
   const result = spawnSync('docker', ['compose', '-p', project, ...args], { cwd, env, input, encoding: 'utf8', timeout: 300000 });
   if (result.status !== 0) throw new Error(`Compose ${args[0]} failed: ${result.stderr ?? result.error}`);
@@ -37,13 +37,20 @@ try {
   const device = (await request('/api/v1/device/pair', 'POST', { pairingToken: invitation.pairingToken, name: 'Compose smoke test', apiVersion: 1 }, {})).body;
   const event = { eventId: 'compose-fictional-1', sender: 'Example', body: 'Fictional compose test', subscriptionId: null, receivedAt: Date.now() };
   const deviceHeaders = { authorization: `Bearer ${device.deviceToken}` };
+  await request('/api/v1/device/heartbeat', 'POST', {}, deviceHeaders);
+  assert.equal((await request('/api/v1/devices')).body.devices[0].presence, 'online');
   await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   compose(['up', '-d', '--force-recreate', '--wait']);
   await request('/api/v1/auth/session');
   const replay = await request('/api/v1/device/messages', 'POST', event, deviceHeaders);
   assert.equal(replay.body.duplicate, true);
   assert.equal((await request('/api/v1/messages')).body.messages.length, 1);
-  console.info('Compose passed: bundled UI/assets, private API, initialize, authenticate, pair, ingest, recreate, persist session, deduplicate.');
+  assert.equal((await request('/api/v1/devices')).body.devices[0].presence, 'online');
+  await request('/api/v1/device/unpair', 'POST', {}, deviceHeaders);
+  assert.deepEqual((await request('/api/v1/devices')).body.devices, []);
+  assert.equal((await request('/api/v1/messages')).body.messages.length, 1);
+  assert.equal((await fetch(`${origin}/api/v1/device/heartbeat`, { method: 'POST', headers: { ...deviceHeaders, 'content-type':'application/json', connection:'close' }, body:'{}' })).status,401);
+  console.info('Compose passed: heartbeat, unpair removes credentials but retains SMS; bundled UI/assets, private API, initialize, authenticate, pair, ingest, recreate, persist session, deduplicate.');
 } finally {
   // This unique project contains only test-created credentials and fictional messages.
   compose(['down', '-v']);

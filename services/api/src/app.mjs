@@ -17,6 +17,7 @@ export function createApp({
   database = ":memory:",
   origin = "https://localhost",
   insecureLocal = false,
+  insecureHttp = false,
   webRoot,
   now = Date.now,
 } = {}) {
@@ -26,12 +27,15 @@ export function createApp({
   if (
     url.protocol !== "https:" &&
     !(
-      insecureLocal &&
       url.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+      (insecureHttp ||
+        (insecureLocal &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))
     )
   ) {
-    throw new Error("HTTPS is required except explicit loopback development");
+    throw new Error(
+      "HTTPS is required unless HTTP development is explicitly enabled",
+    );
   }
   const staticRoot = webRoot ? resolve(webRoot) : null;
   if (staticRoot) accessSync(join(staticRoot, "index.html"));
@@ -64,7 +68,7 @@ export function createApp({
     name: "SIMLink",
     apiVersion: 1,
     serverVersion: "0.1.0",
-    capabilities: ["sms.receive"],
+    capabilities: ["sms.receive", "device.heartbeat", "device.unpair"],
   }));
   return app;
 }

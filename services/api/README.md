@@ -1,6 +1,6 @@
 # SIMLink API · P1 服务端基础
 
-Node.js 22+（容器 Node.js 24）、Fastify 5、better-sqlite3 / SQLite。单管理员、单进程、单数据库，无 Redis。当前提供登录、配对和收件接口；**PWA 已接入登录、收件与设备管理；Android 仍是本地 P0 应用，尚未上传到此服务，远程发送和通知尚未实现。**
+Node.js 22+（容器 Node.js 24）、Fastify 5、better-sqlite3 / SQLite。单管理员、单进程、单数据库，无 Redis。当前提供登录、配对和收件接口；**PWA 已接入登录、收件与设备管理；Android 已实现 P1 配对与上传代码，尚未完成真机联调，远程发送和通知尚未实现。**
 
 ## Docker Compose 部署
 
@@ -44,7 +44,7 @@ unset simlink_password
 PUBLIC_ORIGIN=http://localhost:8787 ALLOW_INSECURE_LOCAL=1 npm start
 ```
 
-HTTP 开关仅接受 localhost / 回环地址；不允许用于局域网手机或公网。正常 HTTPS 使用 `__Host-simlink` Secure/HttpOnly Cookie；本地 HTTP 使用不同 Cookie 名。`HOST` 默认 127.0.0.1，`PORT` 默认 8787，`DATABASE_PATH` 默认 `./data/simlink.sqlite`。容器内部监听 0.0.0.0，由 Compose 限制宿主机发布地址。
+ALLOW_INSECURE_LOCAL 仅接受 localhost / 回环地址。内网 HTTP 调试另用显式 ALLOW_INSECURE_HTTP，配置见下节。正常 HTTPS 使用 `__Host-simlink` Secure/HttpOnly Cookie；本地 HTTP 使用不同 Cookie 名。`HOST` 默认 127.0.0.1，`PORT` 默认 8787，`DATABASE_PATH` 默认 `./data/simlink.sqlite`。容器内部监听 0.0.0.0，由 Compose 限制宿主机发布地址。
 
 ## 数据、升级与备份
 
@@ -66,7 +66,7 @@ chmod 600 "backups/$backup_name"
 
 这些备份包含私密数据；转移离机前需加密。恢复到同版本测试实例时先停止 API，再将备份解包到该实例的 `/data` 卷，保持 UID 1000 可读写，然后启动检查。不要将未经验证的恢复直接覆盖唯一生产卷。网页会话与设备令牌恢复后仍有效，泄漏备份应按凭证泄漏处理。
 
-本阶段尚未实现自动保留期清理、管理员密码重置、设备心跳、阅读状态、SIM 永久身份、推送。短信暂保留至手动运维删除；不能宣称已实现计划中的默认 30 天清理。正式接入真实短信前须在管理体验中明确当前保留策略。
+本阶段尚未实现自动保留期清理、管理员密码重置、阅读状态、SIM 永久身份、推送。短信暂保留至手动运维删除；不能宣称已实现计划中的默认 30 天清理。正式接入真实短信前须在管理体验中明确当前保留策略。
 
 ## 验证
 
@@ -79,3 +79,38 @@ chmod 600 "backups/$backup_name"
 合并部署验证：`npm test` 9/9 通过，包含静态页面、SPA 导航、私有 API 鉴权、缺失资源与隐藏文件边界。`npm run test:compose` 已通过，同时验证镜像中的页面和 JS/CSS 资源、私有接口拒绝未登录访问，以及容器重建后的会话与短信持久化。独立前端开发仍可使用 Vite；本地后端要托管构建页面，先执行 `npm --prefix ../../apps/web run build:client`，再设置 `WEB_ROOT=../../apps/web/dist/client` 启动服务。
 
 模块化接入验证：后端 9 项测试、Web 9 项模型/会话测试、4 项 Sites 兼容检查及 Compose 重新构建/持久化检查通过。Web 使用实际 API 和独立虚构测试数据完成浏览器登录、刷新恢复、收件详情与退出验证；Android 和 iOS 真机闭环仍未完成。
+
+
+## Android 内网 HTTP 调试
+
+可以不部署 HTTPS 代理做内网联调。默认仍只监听宿主机回环，显式修改 `.env`：
+
+```dotenv
+PUBLIC_ORIGIN=http://192.168.1.10:8787
+SIMLINK_BIND=192.168.1.10
+SIMLINK_PORT=8787
+ALLOW_INSECURE_HTTP=1
+ALLOW_INSECURE_LOCAL=0
+```
+
+把示例 IP 替换为部署主机的实际 LAN 地址；浏览器与手机使用同一地址，然后运行 `docker compose up -d --build --wait`。Docker Desktop 若不能绑定指定主机地址，可用 SIMLINK_BIND=0.0.0.0 并通过主机防火墙限制内网访问。此开关不会自动关闭主机防火墙。
+
+管理员初始化照前文执行。Web 登录 → 设备 → 生成配对二维码；Android **Debug APK** 打开“服务器与同步 → 扫码配对”，扫描后显式勾选内网 HTTP，再核对地址并确认。仍可手动输入地址与凭证。配对后再发送新的测试短信；旧本地短信不自动上传。
+
+HTTP 将明文传输密码、设备凭证和短信，仅用于可信内网调试；Cookie 仍为 HttpOnly/SameSite，Origin/CSRF 仍校验，但没有 Secure。手机访问 localhost 是手机自身。HTTP 下剪贴板、安装型 PWA 和推送等安全上下文功能不作为调试验收条件；公网与 Release APK 使用现有主机 HTTPS 代理。
+
+
+## 本机持久调试实例
+
+本次调试采用 Compose 项目名 `simlink-debug`，独立卷 `simlink-debug_simlink-data`。本机参数位于忽略提交的 `.env`，初始化密码保存在本机 `data/local-debug-login.txt`（权限 600），不写入仓库。维护此实例时使用同一项目名：
+
+```sh
+docker compose -p simlink-debug ps
+docker compose -p simlink-debug up -d --build --wait
+docker compose -p simlink-debug stop
+```
+
+地址随本机局域网 IP 变化，需要同步修改 `.env` 并重建容器；Android 应使用新地址重新配对，旧队列不会自动迁移。配对后的新短信持久保存于调试卷，旧手机记录不会自动导入。不要使用 `down -v` 清理此实例。
+
+
+心跳已接入：设备页展示最后联系与推断在线状态（35 分钟阈值），每 30 秒自动刷新。解除配对删除有效设备条目和凭证，短信保留。数据库升级到 v2 时自动清理旧 revoked_at 条目；迁移前先备份数据卷。旧版仅本地解除但未通知后端的条目需手动在 Web 解除。
