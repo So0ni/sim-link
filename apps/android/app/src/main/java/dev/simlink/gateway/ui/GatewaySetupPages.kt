@@ -45,7 +45,7 @@ class GatewaySetupPages(
         section("远程发送")
         permissionRow("发送短信",Manifest.permission.SEND_SMS,"允许已配对服务器提交发件，使用实体 SIM，可能产生运营商费用。")
         val remote = dev.simlink.gateway.commands.RemoteSendSettings(activity)
-        text("手机前台约15秒检查任务；后台由系统调度，可能延迟超过5分钟有效期。小米可能逐条要求确认。",true)
+        text("手机前台约15秒检查任务；后台由系统调度，可能延迟超过5分钟有效期。手机系统可能要求确认发送。",true)
         if (dev.simlink.gateway.connection.ConnectionStore(activity).current() == null) text("请先连接服务器，再启用远程发送。",true)
         else content.addView(gatewayStyle.action(if(remote.optedIn()) "关闭远程发送" else "启用远程发送") {
             remote.setEnabled(!remote.optedIn())
