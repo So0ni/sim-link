@@ -41,3 +41,13 @@ endpoint 仅接受 HTTPS 默认端口、无用户信息/fragment，并限制为 
 真实设备待验收：开启系统权限 → 发送测试通知 → 将 PWA 切到后台/锁屏 → 新虚构短信触发通知并显示发件人 → 点击回到对应会话 → 关闭/退出后不再接收新通知。自动化 mock 和浏览器页面验收不代替此项。
 
 实现参考：[PushManager.subscribe](https://developer.mozilla.org/en-US/docs/Web/API/PushManager/subscribe)、[web-push](https://github.com/web-push-libs/web-push)。
+
+## 本次部署与检查结果
+
+- 提交 `89aa08d`，远程镜像 `simlink-api:89aa08d-amd64`，Compose 项目 `simlink-dev`。本机完成 amd64 构建；仅上传约 248 KiB 的新依赖及应用产物，在原镜像上组装，无服务器 npm 安装/编译。
+- 升级前备份：`/opt/simlink/backups/before-push-20260929T134352Z.tar.gz`，权限 0600，归档可读取。未执行恢复演练。
+- 数据库由 v6 升级 v7，`quick_check=ok`；升级前后 1 条短信、1 台设备、0 条发件命令保持一致。
+- 容器 healthy，仍只绑定 `127.0.0.1:8787`；公网 health 200，未登录 push 接口 401；新建隔离验收会话可读取公钥和自己的空订阅列表。
+- 容器强制重建后，公钥保持一致、验收会话仍有效；检查后已注销该验收会话。
+- API 29/29、Web 30/30、Sites 4/4 测试通过；Web typecheck/build 通过。浏览器检查 390px 与 1440px 设置页，无横向溢出；自动化环境未完成系统级 Push 订阅与实际通知显示，不算真实 Push 闭环通过。
+- 下一项：iPhone 主屏幕 PWA 更新 → 设置开启通知 → 测试通知 → 后台/锁屏接收新短信提醒（含发件人）→ 点击对应会话 → 关闭或退出验证。
