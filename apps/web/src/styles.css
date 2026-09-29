@@ -1055,6 +1055,10 @@ dialog::backdrop {
     font-size: 14px;
   }
   .bottom-nav {
+    /* Keep app navigation from opening iOS link previews on a long press. */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
     position: fixed;
     bottom: 0;
     left: 0;

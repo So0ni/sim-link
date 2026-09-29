@@ -868,7 +868,7 @@ export function DemoApp() {
         )}
       </main>
       {!(active || composing) && (
-        <nav className="bottom-nav" aria-label="手机导航">
+        <nav className="bottom-nav" aria-label="手机导航" onContextMenu={event => event.preventDefault()}>
           {nav}
         </nav>
       )}

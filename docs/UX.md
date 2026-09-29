@@ -403,3 +403,5 @@ Android 0.2.2 将初次配对与日常维护分开：未配对时以扫码为主
 ## 2026-09-29 Web Push 首版
 
 用户确认首版通知包含发件人，不显示正文；此决定覆盖流程 D 的默认仅提醒文案。设置增加“此设备通知”，默认关闭、用户主动授权、可测试和关闭。当前仅新短信，不提前展示未实现的 Telegram/失联/全文配置。服务端投递状态与设备实际显示分开。完整行为和验收边界见 [WEB-PUSH.md](WEB-PUSH.md)。
+
+底部主导航保留链接语义、键盘访问、当前页标记及 hash 路由，但禁用导航区域的长按链接预览、文本选择和上下文菜单，使其按应用导航使用。仅作用于底部导航，不限制短信正文选择/复制或桌面侧栏链接。iOS 使用 `-webkit-touch-callout: none`，其他浏览器通过导航区域的 contextmenu 处理兼容；真实 iOS 长按效果需设备复验。属性依据：[MDN](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/-webkit-touch-callout)。

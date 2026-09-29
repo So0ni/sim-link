@@ -147,7 +147,7 @@ export function App() {
           </section>
         </main>
       )}
-      <nav className="bottom-nav" aria-label="移动导航">
+      <nav className="bottom-nav" aria-label="移动导航" onContextMenu={event => event.preventDefault()}>
         {nav}
       </nav>
     </div>
