@@ -39,7 +39,7 @@ test('session list timestamps, current marker, foreground-only activity, CSRF an
   assert.equal((await list(app,first))[0].lastActiveAt,stamp);
   assert.equal((await list(app,first))[0].createdAt,100000);
   const target=entries[1].id;
-  app.store.prepare('INSERT INTO push_subscriptions VALUES(?,?,?,?,?,?)').run('sub',target,'https://fcm.googleapis.com/fictional','key','auth',stamp);
+  app.store.prepare('INSERT INTO push_subscriptions(id,session_id,endpoint,p256dh,auth,created_at) VALUES(?,?,?,?,?,?)').run('sub',target,'https://fcm.googleapis.com/fictional','key','auth',stamp);
   app.store.prepare('INSERT INTO devices(id,name,token_hash,created_at) VALUES(?,?,?,?)').run('gateway','Test gateway','fake-hash',stamp);
   const url=`/api/v1/auth/sessions/${target}`;
   assert.equal((await app.inject({method:'DELETE',url,headers:{origin,cookie:first.cookie}})).statusCode,403);
@@ -60,7 +60,7 @@ test('v8 sessions migrate without invented login dates; resume persists and neve
   await initializeAdmin(db,password);
   let stamp=100000;let auth=createAuthService(db,()=>stamp);
   const raw=await auth.login(password,'Firefox/130');
-  db.exec('DROP TABLE session_details; PRAGMA user_version=8;');db.close();
+  db.exec('ALTER TABLE push_subscriptions DROP COLUMN preview_length; ALTER TABLE push_jobs DROP COLUMN accepted_at; ALTER TABLE push_jobs DROP COLUMN worker_received_at; ALTER TABLE push_jobs DROP COLUMN notification_shown_at; DROP TABLE session_details; PRAGMA user_version=8;');db.close();
   db=openStore(path);auth=createAuthService(db,()=>stamp);
   const session=auth.read(raw);
   assert.equal(auth.list(session.id)[0].createdAt,null);

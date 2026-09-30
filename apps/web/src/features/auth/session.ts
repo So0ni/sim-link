@@ -1,3 +1,4 @@
+import { updateAppBadge } from "../../pwa/badge.ts";
 import { ApiClient } from "../../shared/api/client.ts";
 export type Session = { id: string; expiresAt: number; csrfToken: string };
 export type AuthState =
@@ -26,6 +27,8 @@ export class SessionController {
   invalidate = () => {
     this.epoch++;
     this.api.clearSession();
+    void updateAppBadge(0);
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) navigator.serviceWorker.controller?.postMessage({type:'CLEAR_BADGE'});
     this.api.views.clear();
     this.set({ status: "guest" });
   }

@@ -7,16 +7,17 @@ import { listSims, simTitle, type Sim } from '../sims/api.ts';
 import { listDevices, type Device } from '../devices/api.ts';
 import { recipientNumber, reconcileSubmission, stateLabel, reasonLabel, type Command, type SendRequest } from './model.ts';
 
-function CommandCard({command:c,api,refresh}:{command:Command;api:ApiClient;refresh:()=>void}) {
+export function CommandCard({command:c,api,refresh,compact=false}:{command:Command;api:ApiClient;refresh:()=>void;compact?:boolean}) {
   const [error,setError]=useState('');const [busy,setBusy]=useState(false);
-  return <article className="live-card command-card">
-    <strong>{c.recipient}</strong><p className="command-body">{c.body}</p>
-    <p role="status">{stateLabel[c.state] ?? c.state}</p>
+  return <article className={compact?"message outgoing command-card chat-command":"live-card command-card"}>
+    {!compact&&<strong>{c.recipient}</strong>}<p className={compact?"bubble":"command-body"}>{c.body}</p>
+    <p className={compact?"message-meta":undefined} role="status">{stateLabel[c.state] ?? c.state}</p>
     {c.reason && <p>{reasonLabel[c.reason] ?? '请检查手机状态'}</p>}
-    <p className="field-help">提交：{new Date(c.createdAt).toLocaleString()} · 有效至 {new Date(c.expiresAt).toLocaleTimeString()}</p>
+    <details className="command-details"><summary>发送详情</summary><p className="field-help">提交：{new Date(c.createdAt).toLocaleString()} · 有效至 {new Date(c.expiresAt).toLocaleTimeString()}</p>
     {c.claimedAt && <p className="field-help">手机领取：{new Date(c.claimedAt).toLocaleString()}</p>}
     {c.parts.length>0 && <details><summary>分段结果（{c.parts.length} 段）</summary><ol>{c.parts.map((result,i)=><li key={i}>{result===null?'尚未确认':result===-1?'系统已发送':`系统失败（代码 ${result}）`}</li>)}</ol></details>}
     {['unknown','partial'].includes(c.state) && <p className="field-help">请先向收件人核对，系统不会自动重发。</p>}
+    </details>
     {c.state==='pending' && <button className="secondary command-cancel" disabled={busy} onClick={async()=>{
       setBusy(true);setError('');try{await api.request(`/commands/${c.id}/cancel`,{method:'POST'});refresh();}
       catch(e){setError(e instanceof ApiError && e.status===409?'手机已领取或任务已结束，无法取消。请刷新状态。':errorText(e));refresh();}finally{setBusy(false);}
@@ -27,7 +28,7 @@ function CommandCard({command:c,api,refresh}:{command:Command;api:ApiClient;refr
 export function CommandHistory({api,commands,refresh,sims}:{api:ApiClient;commands:Command[];refresh:()=>Promise<unknown>;sims:Sim[]}) {
   return <section className="send-history" aria-label="发件记录"><div className="send-history-heading"><h2>发件记录</h2><RefreshButton label="刷新发件状态" onRefresh={refresh}/></div>{commands.length===0 && <p className="field-help">暂无发件记录</p>}{commands.map(c=><div key={c.id}><p className="field-help">发送 SIM：{sims.find(s=>s.id===c.simId) ? simTitle(sims.find(s=>s.id===c.simId)!) : '原 SIM（已不可用）'}</p><CommandCard command={c} api={api} refresh={refresh}/></div>)}</section>;
 }
-export function SendPage({api,path,visible}:{api:ApiClient;path:string;visible:boolean}) {
+export function SendPage({api,path,visible,onSent}:{api:ApiClient;path:string;visible:boolean;onSent:(command:Command)=>void}) {
   const cached=api.views.get<{sims:Sim[];devices:Device[];commands:Command[]}>('send');
   const [sims,setSims]=useState<Sim[]>(cached?.sims??[]);const [devices,setDevices]=useState<Device[]>(cached?.devices??[]);const [commands,setCommands]=useState<Command[]>(cached?.commands??[]);
   const [simId,setSim]=useState('');const [recipient,setRecipient]=useState('');const [body,setBody]=useState('');
@@ -63,16 +64,16 @@ export function SendPage({api,path,visible}:{api:ApiClient;path:string;visible:b
     inFlight.current=true;setBusy(true);setError('');
     const request=attempt??{requestId:crypto.randomUUID(),simId,recipient:normalized!,body};setAttempt(request);
     try{
-      if(attempt)await reconcileSubmission(api,request);else await api.request<Command>('/commands',{method:'POST',body:request});
-      setAttempt(null);setBody('');drafts.current.delete(context.current);await refresh();
+      const command=attempt?await reconcileSubmission(api,request):await api.request<Command>('/commands',{method:'POST',body:request});
+      setAttempt(null);setBody('');drafts.current.delete(context.current);await refresh();onSent(command);
     }catch(e){
       if(e instanceof ApiError && [400,403,409,429].includes(e.status)){setAttempt(null);setError(e.status===409?'发送条件已变化：请检查手机已启用远程发送及 SIM 状态。':errorText(e));}
       else setError('提交结果尚未确认。请核对原请求，勿另建相同短信；草稿已保留。');
     }finally{inFlight.current=false;setBusy(false);}
   }
   return <main className="main live-page send-page" hidden={!visible}><div className="send-content">
-    <PageBrand /><div className="title-row send-heading"><h1>发送短信</h1><a className="send-back" href="#/inbox">返回收件箱</a></div>
-    <section className="live-card"><h2>新建 / 回复</h2>
+    <PageBrand /><div className="title-row send-heading"><h1>新建短信</h1><a className="send-back" href="#/inbox">返回收件箱</a></div>
+    <section className="live-card"><h2>新建会话</h2>
       <p className="field-help">使用实体 SIM 发送，可能产生运营商费用。手机后台可能延迟，系统可能要求确认发送。</p>
       <label>发送 SIM<select value={simId} disabled={busy||!!attempt} onChange={e=>{drafts.current.set(JSON.stringify([simId,recipient]),body);const next=JSON.stringify([e.target.value,recipient]);setSim(e.target.value);setBody(drafts.current.get(next)??'');context.current=next;}}><option value="">请选择发送卡</option>{sims.map(s=><option value={s.id} key={s.id}>{simTitle(s)} · {devices.find(d=>d.id===s.deviceId)?.name??'原设备'}{s.state==='active'?'':'（不可用）'}</option>)}</select></label>
       <label>收件号码<input type="tel" autoComplete="off" value={recipient} placeholder="+8613800000000" disabled={busy||!!attempt} onChange={e=>setRecipient(e.target.value)}/></label>

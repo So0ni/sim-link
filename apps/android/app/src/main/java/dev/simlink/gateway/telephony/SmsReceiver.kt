@@ -10,12 +10,14 @@ import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import java.security.MessageDigest
 import dev.simlink.gateway.sync.SyncScheduler
+import dev.simlink.gateway.sync.SyncDiagnostics
 
 open class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)?.toList().orEmpty()
         if (messages.isEmpty()) return
+        SyncDiagnostics.record(SyncDiagnostics.Phase.SMS_RECEIVED)
         // OEM broadcasts may omit subscription. Preserve unknown; never guess the default SIM.
         @Suppress("DEPRECATION")
         val subscription = intent.extras?.get(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX)
@@ -32,7 +34,9 @@ open class SmsReceiver : BroadcastReceiver() {
         LocalIo.executor.execute {
             try {
                 MessageStore.get(context).insert(id, address, body, subId, first.timestampMillis, false)
-                runCatching { SyncScheduler.schedule(context) }
+                SyncDiagnostics.record(SyncDiagnostics.Phase.SMS_STORED)
+                runCatching { SyncScheduler.scheduleSms(context) }
+                    .onFailure { SyncDiagnostics.record(SyncDiagnostics.Phase.SMS_SCHEDULE_REJECTED) }
             } finally { pending.finish() }
         }
     }

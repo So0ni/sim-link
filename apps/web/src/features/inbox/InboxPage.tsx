@@ -1,6 +1,6 @@
 import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
 import { PageBrand } from "../../shared/ui/PageBrand.tsx";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowLeft,
   Copy,
@@ -8,38 +8,51 @@ import {
 } from "@phosphor-icons/react";
 import type { ApiClient } from "../../shared/api/client.ts";
 import { useVisibleReading } from "./useVisibleReading.ts";
+import { useConversationScroll } from "./useConversationScroll.ts";
 import { useInbox } from "./useInbox.ts";
-import { conversations, simKey, simLabel, simTabs, senderAvatar } from "./model.ts";
-import { recipientNumber } from '../send/model.ts';
+import { simKey, simLabel, simTabs, senderAvatar } from "./model.ts";
+import { threads, matchesThread } from './threads.ts';
+import { useSendData } from '../send/useSendData.ts';
+import { CommandCard } from '../send/SendPage.tsx';
+import { ConversationComposer, type ReplyDraft } from '../send/ConversationComposer.tsx';
 export function InboxPage({
   api,
   selected,
   go,
+  visible,
 }: {
   api: ApiClient;
+  visible: boolean;
   selected: string | null;
   go: (path: string) => void;
 }) {
-  const inbox = useInbox(api);
+  const inbox = useInbox(api,visible);
+  const outgoing=useSendData(api,visible);
+  const drafts=useRef(new Map<string,ReplyDraft>());
   const [sim, setSim] = useState("all");
   const [copyResult, setCopyResult] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const tabs = simTabs(inbox.messages, inbox.sims);
-  const scoped = conversations(inbox.messages).filter(
-    (c) => sim === "all" || simKey(c.messages[0]) === sim,
+  const allThreads=threads(inbox.messages,outgoing.commands);
+  const scoped = allThreads.filter(
+    (c) => sim === "all" || simKey(c.anchor) === sim,
   );
-  const active = scoped.find((c) => c.id === selected);
+  const active = allThreads.find((c) => matchesThread(c,selected));
+  const activeId=useRef(active?.id);activeId.current=active?.id;
   const unreadCount = scoped.reduce((count, c) => count + c.messages.filter(m => !m.isRead).length, 0);
   const items = scoped.filter(c => !unreadOnly || c.messages.some(m => !m.isRead));
-  const visibleReading = useVisibleReading(active?.id, active?.messages ?? [], inbox.readingBusy, inbox.markReading);
+  const visibleReading = useVisibleReading(visible?active?.id:undefined, active?.messages ?? [], inbox.readingBusy, inbox.markReading);
+  useConversationScroll(visibleReading.root, active?.id, active?.timeline.length ?? 0, active?.last.id);
+  const originalSim=active?.anchor.simKey?inbox.sims.find(s=>s.deviceId===active.anchor.deviceId&&s.simKey===active.anchor.simKey):undefined;
+  if(active&&!drafts.current.has(active.id))drafts.current.set(active.id,{body:'',attempt:null,busy:false,error:''});
   return (
-    <main className={`main inbox-layout ${selected ? "has-detail" : ""}`}>
+    <main hidden={!visible} className={`main inbox-layout ${selected ? "has-detail" : ""}`}>
       <section className="inbox-list" aria-label="短信列表">
         <div className="list-top">
           <PageBrand />
           <div className="title-row">
             <h1>短信</h1>
-            <a className="text-button" href="#/send">新建 / 发件</a>
+            <a className="text-button" href="#/send">新建短信</a>
             <RefreshButton label="刷新短信" onRefresh={inbox.refresh} />
           </div>
           <div
@@ -91,7 +104,7 @@ export function InboxPage({
             </div>
           )}
           {items.map((c) => {
-            const last = c.messages.at(-1)!;
+            const last = {...c.anchor,body:c.last.message?.body??c.last.command!.body,receivedAt:c.last.at};
             const unread = c.messages.filter(m => !m.isRead).length;
             return (
               <article
@@ -121,7 +134,8 @@ export function InboxPage({
         </div>
       </section>
       <section className="detail-pane" aria-label="短信详情">
-        {inbox.readingError && <p className="live-error reading-feedback" role="alert">{inbox.readingError} 可用“标为已读 / 未读”重试。</p>}
+        {inbox.readingError && <p className="live-error reading-feedback" role="alert">{inbox.readingError} 请重新进入会话重试。</p>}
+        {outgoing.error&&<p className="live-error reading-feedback" role="alert">{outgoing.error} 发件状态暂未更新。</p>}
         {active ? (
           <>
             <header className="detail-header">
@@ -133,27 +147,17 @@ export function InboxPage({
                 <ArrowLeft size={24} />
               </button>
               <div>
-                <h2>{active.messages[0].sender}</h2>
-                <p>{simLabel(active.messages[0], inbox.sims)}</p>
+                <h2>{active.anchor.sender}</h2>
+                <p>{simLabel(active.anchor, inbox.sims)}</p>
               </div>
             </header>
-            <div className="reading-actions">
-              {recipientNumber(active.messages[0].sender) && active.messages[0].simKey && <a className="text-button" href={`#/send?sim=${encodeURIComponent(inbox.sims.find(s=>s.deviceId===active.messages[0].deviceId&&s.simKey===active.messages[0].simKey)?.id??'')}&to=${encodeURIComponent(active.messages[0].sender)}`}>回复 · 使用原 SIM</a>}
-              <button disabled={inbox.readingBusy} onClick={() => {
-                visibleReading.suppress();
-                void inbox.markReading(active.messages, false);
-              }}>标为未读</button>
-              <button disabled={inbox.readingBusy} onClick={() => void inbox.markReading(active.messages, true)}>标为已读</button>
-              {inbox.readingBusy && <span role="status">正在保存…</span>}
-            </div>
             <div className="message-scroll" ref={visibleReading.root}>
               <div className="messages">
-                {active.messages.map((m) => (
+                {active.timeline.map((item) => item.command ? <CommandCard key={item.id} command={item.command} api={api} refresh={()=>void outgoing.refresh()} compact/> : (()=>{const m=item.message!;return (
                   <article className="message" key={m.sequence} data-sequence={m.sequence}>
                     <p className="bubble">{m.body}</p>
                     <div className="message-meta">
                       <time>{new Date(m.receivedAt).toLocaleString()}</time>
-                      <span>{m.isRead ? "已读" : "未读"}</span>
                       <button
                         aria-label="复制短信正文"
                         onClick={async () => {
@@ -170,12 +174,13 @@ export function InboxPage({
                       </button>
                     </div>
                   </article>
-                ))}
+                );})())}
               </div>
               <p role="status" className="field-help">
                 {copyResult}
               </p>
             </div>
+            <ConversationComposer key={active.id} api={api} draft={drafts.current.get(active.id)!} sim={originalSim} device={outgoing.devices.find(d=>d.id===active.anchor.deviceId)} sender={active.anchor.sender} onSent={command=>{outgoing.accept(command);const root=visibleReading.root.current;if(root&&activeId.current===active.id)requestAnimationFrame(()=>{root.scrollTop=root.scrollHeight;});}}/>
           </>
         ) : (
           <div className="empty">

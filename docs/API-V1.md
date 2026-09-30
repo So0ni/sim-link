@@ -1,5 +1,7 @@
 # API v1 · 服务端首个可运行切片
 
+正文预览增量：`GET /api/v1/push` 的订阅新增 `previewLength`（默认 0，关闭）。`PATCH /api/v1/push/subscriptions/:id` 接收并返回 `{previewLength}`（整数 0–200），需当前会话、Origin 和 CSRF；非本会话订阅返回 404，非法长度返回 400。设置按订阅持久化。Web Push 保留原字段，新增可选 `preview`；新版 Worker 将原 `body` 的发件人提醒作为标题，`preview` 作为正文，校验会话失败不显示二者。Android 上传契约不变。SQLite v11 增量迁移，旧服务端不能直接打开 v11 数据库。
+
 当前实现位于 `services/api`。同一服务托管 `/` Web 页面和静态资源；前端资源公开加载不赋予 API 权限，PWA 已接入持久登录、收件读取及配对管理。Android 核心真实收件链路已有真机验证，具体版本和未覆盖场景见 P1-ACCEPTANCE.md。默认传输为同源 HTTPS JSON；请求上限 128 KiB，JSON 字段严格校验。响应 `Cache-Control: no-store`。时间统一为 Unix 毫秒，所有错误为 `{ "error": "code" }`；401 表示身份失效、403 表示 Origin/CSRF 拒绝，网络错误不能被客户端解释为退出登录。
 
 ## 登录与会话
@@ -172,3 +174,14 @@ Android先持久化领取游标，再领取；收到命令后在同一事务保�
 `GET /api/v1/auth/sessions` 仅返回未过期会话，当前会话置顶，其余按最近访问排序。`name` 为 User-Agent 推断的粗粒度系统/浏览器描述，不保存原始 User-Agent 或 IP，不代表硬件唯一身份。`current` 为布尔值；`createdAt` 是本次密码登录创建会话的时间；`lastActiveAt` 在登录或显式前台 `/auth/resume` 时更新，普通 API 读取、通知和轮询不更新。时间单位为毫秒。
 
 SQLite v9 新增独立会话元数据表；旧会话保留有效凭证，未记录的时间为 null，前台恢复只补最近访问，不推测初次登录时间。续期与元数据更新在同一事务中，不能复活已撤销会话。注销级联清除该会话的元数据、推送订阅及待发通知，不影响 Android 凭证和短信。新增响应字段兼容既有客户端；Android 无需升级。
+
+
+## 未读总数与通知诊断（2026-09-30，SQLite v10）
+
+- `GET /api/v1/messages/summary`：管理员会话，响应 `{sessionId,csrfToken,unreadCount}`。count统计服务端所有`is_read=0`短信，不受分页、SIM筛选、500条缓存限制；未登录401。csrfToken沿用auth/session的会话CSRF机制；响应no-store。
+- `GET /api/v1/push`：保留原lastDelivery，新增每订阅最近10条`deliveries`。每条包含`id,state,attempts,createdAt,attemptedAt,acceptedAt,workerReceivedAt,notificationShownAt,result`。后3项未知为null。创建/尝试/受理使用服务端毫秒时钟，Worker收到/显示调用完成为客户端回报的毫秒时钟，不作端到端精确时延或用户已看见的证明。无endpoint、密钥、号码、正文。
+- `POST /api/v1/push/jobs/:id/receipt`：管理员会话 + Origin/CSRF；body `{receivedAt,shownAt}`，非负安全整数毫秒，shownAt可null。只允许当前会话所属订阅的job，未知/跨会话404；每会话每分钟120次限制。首次非空回报保留，重复回报幂等，回报不改变通知状态或短信阅读状态。
+
+推送payload新增非敏感随机`jobId`供诊断关联，旧Worker忽略新字段。新Worker遇summary404回退旧auth/session校验并不更新角标；旧服务不支持阶段回报时忽略回报失败。推荐先升级后端，再接受PWA更新；Android收件/发送接口不变，可独立升级。
+
+SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、VAPID、订阅、队列、会话；升级前一致性备份。旧服务器拒绝打开v10，回滚需配合备份恢复，不能只更换镜像。

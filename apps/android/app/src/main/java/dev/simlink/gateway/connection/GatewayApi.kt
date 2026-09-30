@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.net.HttpURLConnection
 
 class PairingResult(val deviceId: String, val token: String, val serverId: String)
-class ApiFailure(val status: Int) : Exception("HTTP $status")
+class ApiFailure(val status: Int, val hasRetryAfter: Boolean = false) : Exception("HTTP $status")
 class Cancelled : Exception()
 class RequestCancellation {
     val stopped = AtomicBoolean(false)
@@ -34,7 +34,7 @@ class GatewayApi(private val server: String, private val cancellation: RequestCa
                 connection.outputStream.use { it.write(bytes) }
             }
             val status = connection.responseCode
-            if (status != 200) throw ApiFailure(status)
+            if (status != 200) throw ApiFailure(status, connection.getHeaderField("Retry-After") != null)
             val bytes = connection.inputStream.use { it.readNBytes(65537) }
             check(bytes.size <= 65536)
             if (cancellation.stopped.get()) throw Cancelled()

@@ -4,7 +4,7 @@ import { getMessages, getReading, setReading, type ReadingState, type ReceivedMe
 import { ForegroundPoller } from "../../shared/api/polling.ts";
 import { listSims, type Sim } from "../sims/api.ts";
 import { applyReading, mergeReading, mergeMessages } from "./model.ts";
-export function useInbox(api: ApiClient) {
+export function useInbox(api: ApiClient, visible = true) {
   const cached=api.views.get<{sims:Sim[];messages:ReceivedMessage[];updatedAt:number}>("inbox");
   const [sims, setSims] = useState<Sim[]>(cached?.sims??[]);
   const [messages, setMessages] = useState<ReceivedMessage[]>(cached?.messages??[]);
@@ -31,6 +31,7 @@ export function useInbox(api: ApiClient) {
         const result = await setReading(api, items.slice(i, i + 100), isRead, controller.signal);
         if (controller.signal.aborted) return false;
         acceptStates(result.states);
+        window.dispatchEvent(new Event("simlink-reading-changed"));
         if (result.conflicts.length) {
           setReadingError("阅读状态已在其他页面改变，已保留最新结果。请确认后重试。");
           return false;
@@ -96,6 +97,7 @@ export function useInbox(api: ApiClient) {
     if(updatedAt)api.views.set("inbox",{sims,messages,updatedAt});
   },[api,sims,messages,updatedAt]);
   useEffect(() => {
+    if(!visible)return;
     const poller = new ForegroundPoller(refresh, () => document.visibilityState === "visible" && navigator.onLine);
     poller.start();
     document.addEventListener("visibilitychange", poller.wake);
@@ -112,6 +114,6 @@ export function useInbox(api: ApiClient) {
       active.current = null;
       pending.current = null;
     };
-  }, [refresh]);
+  }, [refresh,visible]);
   return { markReading, readingBusy, readingError, messages, sims, error, busy, updatedAt, refresh };
 }

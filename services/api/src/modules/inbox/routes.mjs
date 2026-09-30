@@ -1,3 +1,4 @@
+import { csrf } from "../../platform/crypto.mjs";
 import { object, string } from "../../platform/errors.mjs";
 export function registerInboxRoutes(app, { inbox, devices, sessions }) {
   app.post(
@@ -20,6 +21,10 @@ export function registerInboxRoutes(app, { inbox, devices, sessions }) {
       return ack;
     },
   );
+  app.get("/api/v1/messages/summary", async req => {
+    const session = sessions.read(req);
+    return { ...inbox.summary(), sessionId: session.id, csrfToken: csrf(session.raw) };
+  });
   app.get("/api/v1/messages/reading", async req => {
     sessions.read(req);
     return inbox.readingChanges(req.query.after);

@@ -72,6 +72,7 @@ export function createInboxService(db, now, enqueueNotification = () => {}) {
     };
   });
   return {
+    summary() { return { unreadCount: db.prepare('SELECT count(*) AS n FROM messages WHERE is_read=0').get().n }; },
     receive,
     updateReading,
     readingChanges(cursor) {

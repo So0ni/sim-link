@@ -105,16 +105,55 @@ test('first activation is silent; a waiting update prompts and controller replac
 
 test('push shows sender only for the bound live session; offline fallback is private; safe click deep links',async()=>{
   const events={},shown=[],opened=[];let response={ok:true,status:200,json:async()=>({id:'session'})};
-  const context={URL,Set,AbortSignal,self:{location:{origin:'https://sim.test'},addEventListener:(type,fn)=>events[type]=fn,
+  const context={URL,Set,AbortSignal,AbortController,setTimeout,clearTimeout,self:{location:{origin:'https://sim.test'},addEventListener:(type,fn)=>events[type]=fn,
     registration:{showNotification:async(...args)=>shown.push(args)},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}},
     fetch:async()=>{if(response instanceof Error)throw response;return response;}};
   vm.runInNewContext(source.replace('__BUILD_ID__','test').replace('__PRECACHE__','[]'),context);
   async function fire(type,data){let promise;events[type]({...data,waitUntil:p=>promise=p});await promise;}
   const payload={sessionId:'session',body:'+12025550123 发来一条短信',url:'/#/inbox/test-conversation',tag:'message:1'};
-  await fire('push',{data:{json:()=>payload}});assert.equal(shown[0][1].body,payload.body);assert.equal(shown[0][1].data.url,payload.url);
+  await fire('push',{data:{json:()=>payload}});assert.equal(shown[0][0],payload.body);assert.equal(shown[0][1].body,undefined);assert.equal(shown[0][1].data.url,payload.url);
   response={ok:false,status:401};await fire('push',{data:{json:()=>payload}});assert.equal(shown.length,1);
   response={ok:true,status:200,json:async()=>({id:'different'})};await fire('push',{data:{json:()=>payload}});assert.equal(shown.length,1);
-  response=new Error('offline');await fire('push',{data:{json:()=>payload}});assert.ok(!shown[1][1].body.includes('12025550123'));assert.equal(shown[1][1].data.url,'/#/inbox');
+  response=new Error('offline');payload.preview='FICTIONAL PRIVATE PREVIEW';await fire('push',{data:{json:()=>payload}});assert.equal(shown[1][0],'新通知');assert.ok(!JSON.stringify(shown[1]).includes(payload.preview));assert.ok(!shown[1][1].body.includes('12025550123'));assert.equal(shown[1][1].data.url,'/#/inbox');
   await fire('notificationclick',{notification:{close(){},data:{url:payload.url}}});assert.equal(opened[0],'https://sim.test'+payload.url);
   for(const url of ['https://evil.test/','/api/v1/auth/logout','/#/send'])await fire('notificationclick',{notification:{close(){},data:{url}}});assert.equal(opened.length,1);
+});
+
+test('slow session check falls back privately without waiting for another push; badge failure never blocks display',async()=>{
+ const events={},shown=[],badges=[],reports=[];let mode='slow',timeout,signal;
+ const context={URL,Set,AbortController,Number,Promise,Date,
+  setTimeout:fn=>{timeout=fn;return 1;},clearTimeout:()=>{},
+  self:{location:{origin:'https://sim.test'},addEventListener:(name,fn)=>events[name]=fn,
+   navigator:{setAppBadge:async n=>{badges.push(n);throw Error('denied');},clearAppBadge:async()=>badges.push(0)},
+   registration:{showNotification:async(title,options)=>shown.push({title,...options})}},
+  fetch:async(path,options)=>{
+   if(path.includes('/receipt')){reports.push(JSON.parse(options.body));return {ok:true,status:200,json:async()=>({ok:true})};}
+   if(mode==='slow')return new Promise((resolve,reject)=>{signal=options.signal;signal.addEventListener('abort',()=>reject(Error('timeout')));});
+   return {ok:true,status:200,json:async()=>({sessionId:'s',csrfToken:'fictional',unreadCount:530})};
+  }};
+ vm.runInNewContext(source.replace('__BUILD_ID__','test').replace('__PRECACHE__','[]'),context);
+ let pending;const payload={sessionId:'s',jobId:'fake-job',body:'Private sender',url:'/#/inbox/example',tag:'message:1'};
+ const fire=()=>{events.push({data:{json:()=>payload},waitUntil:p=>pending=p});};
+ fire();assert.equal(shown.length,0);timeout();await pending;
+ assert.equal(signal.aborted,true);assert.equal(shown[0].body,'打开 SIMLink 查看新通知');assert.equal(badges.length,0);
+ mode='online';fire();await pending;assert.equal(shown[1].title,payload.body);assert.equal(shown[1].body,undefined);assert.deepEqual(badges,[530]);
+ payload.preview='Fictional SMS preview';fire();await pending;assert.equal(shown[2].title,payload.body);assert.equal(shown[2].body,payload.preview);
+ assert.ok(reports.some(r=>r.shownAt===null));assert.ok(reports.some(r=>Number.isSafeInteger(r.shownAt)));
+});
+test('logout during verification suppresses stale notification and clears badge',async()=>{
+ const events={},shown=[],badges=[];let resolve;
+ const context={URL,Set,AbortController,setTimeout,clearTimeout,self:{location:{origin:'https://sim.test'},addEventListener:(n,f)=>events[n]=f,
+  navigator:{clearAppBadge:async()=>badges.push(0)},registration:{showNotification:async()=>shown.push(1)}},
+  fetch:()=>new Promise(r=>resolve=r)};
+ vm.runInNewContext(source.replace('__BUILD_ID__','test').replace('__PRECACHE__','[]'),context);
+ let push,clear;events.push({data:{json:()=>({sessionId:'s',body:'Private'})},waitUntil:p=>push=p});
+ events.message({data:{type:'CLEAR_BADGE'},waitUntil:p=>clear=p});await clear;
+ resolve({ok:true,status:200,json:async()=>({sessionId:'s',unreadCount:8})});await push;
+ assert.deepEqual(shown,[]);assert.deepEqual(badges,[0]);
+});
+test('badge OS writes are ordered, zero clears, invalid values ignored',async t=>{
+ const old=Object.getOwnPropertyDescriptor(globalThis,'navigator');t.after(()=>{if(old)Object.defineProperty(globalThis,'navigator',old);else delete globalThis.navigator;});
+ const seen=[];Object.defineProperty(globalThis,'navigator',{configurable:true,value:{setAppBadge:async n=>seen.push(n),clearAppBadge:async()=>seen.push(0)}});
+ const {updateAppBadge}=await import('../src/pwa/badge.ts');
+ await Promise.all([updateAppBadge(530),updateAppBadge(0),updateAppBadge(-1),updateAppBadge(NaN)]);assert.deepEqual(seen,[530,0]);
 });

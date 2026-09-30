@@ -83,7 +83,7 @@ test('v5 migration preserves data; claimed commands and results survive store re
  const dir=mkdtempSync(join(tmpdir(),'simlink-commands-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const path=join(dir,'db.sqlite');
  let db=openStore(path);db.exec('DROP TABLE session_details; DROP TABLE login_failures; DROP TABLE push_jobs; DROP TABLE push_subscriptions; DROP TABLE push_identity; DROP TABLE commands; ALTER TABLE devices DROP COLUMN send_capability; ALTER TABLE devices DROP COLUMN send_capability_at; PRAGMA user_version=5;');
  db.prepare("INSERT INTO messages(device_id,event_id,sender,body,received_at,synced_at,is_read,read_version) VALUES('old-device','event','Fictional','Historical',1,1,1,7)").run();db.close();
- db=openStore(path);assert.equal(db.pragma('user_version',{simple:true}),9);assert.equal(db.prepare('SELECT is_read,read_version FROM messages').get().read_version,7);
+ db=openStore(path);assert.equal(db.pragma('user_version',{simple:true}),11);assert.equal(db.prepare('SELECT is_read,read_version FROM messages').get().read_version,7);
  const sim=randomUUID(),key=randomUUID(),device=randomUUID();
  db.prepare("INSERT INTO devices(id,name,token_hash,created_at,send_capability,send_capability_at) VALUES(?,'Test','hash',1,1,1000)").run(device);
  db.prepare("INSERT INTO sims(id,device_id,local_key,subscription_id,slot_index,carrier,state,reported_at) VALUES(?,?,?,1,0,'Test','active',1)").run(sim,device,key);

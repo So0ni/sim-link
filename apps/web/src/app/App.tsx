@@ -1,3 +1,4 @@
+import { useBadge } from "../pwa/useBadge.ts";
 import { SessionSettings } from "../features/auth/SessionSettings.tsx";
 import { PushSettings } from '../features/push/PushSettings.tsx';
 import { PageBrand } from "../shared/ui/PageBrand.tsx";
@@ -28,7 +29,18 @@ function useRoute() {
 export function App() {
   const [auth] = useState(() => new SessionController(new ApiClient()));
   const state = useSyncExternalStore(auth.subscribe, auth.snapshot);
+  useBadge(auth.api, state.status === "ready" ? state.session.id : undefined);
   const [path, go] = useRoute();
+  useEffect(()=>{
+    const viewport=window.visualViewport;
+    const sync=()=>{
+      const style=document.documentElement.style;
+      if(viewport&&viewport.scale===1){style.setProperty('--conversation-height',`${viewport.height}px`);style.setProperty('--conversation-top',`${viewport.offsetTop}px`);}
+      else {style.removeProperty('--conversation-height');style.removeProperty('--conversation-top');}
+    };
+    sync();viewport?.addEventListener('resize',sync);viewport?.addEventListener('scroll',sync);
+    return()=>{viewport?.removeEventListener('resize',sync);viewport?.removeEventListener('scroll',sync);document.documentElement.style.removeProperty('--conversation-height');document.documentElement.style.removeProperty('--conversation-top');};
+  },[]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -96,7 +108,7 @@ export function App() {
     </a>
   ));
   return (
-    <div className="app-shell" key={state.session.id}>
+    <div className={`app-shell ${page==="inbox"&&selected?"conversation-open":""}`} key={state.session.id}>
       <aside className="sidebar">
         <a href="#/inbox" className="wordmark">
           SIMLink
@@ -106,10 +118,8 @@ export function App() {
           <span className="host">{location.host}</span>
         </div>
       </aside>
-      <SendPage api={auth.api} path={path} visible={page === "send"} />
-      {page === "inbox" && (
-        <InboxPage api={auth.api} selected={selected} go={go} />
-      )}
+      <SendPage api={auth.api} path={path} visible={page === "send"} onSent={command=>go(`/inbox/${encodeURIComponent(JSON.stringify([command.deviceId,command.simKey,command.recipient]))}`)} />
+      <InboxPage api={auth.api} selected={selected} go={go} visible={page==="inbox"} />
       {page === "devices" && <DevicesPage api={auth.api} />}
       {page === "settings" && (
         <main className="main live-page">
