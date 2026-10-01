@@ -11,8 +11,8 @@ import dev.simlink.gateway.connection.RequestCancellation
 object SyncScheduler {
     private const val IMMEDIATE = 101
     private const val PERIODIC = 102
-    private const val SMS = 103
-    private val smsDispatch = SmsSyncDispatch()
+    private const val INCOMING = 103
+    private val incomingDispatch = IncomingSyncDispatch()
 
     private fun builder(context: Context, id: Int) = JobInfo.Builder(id, ComponentName(context, UploadJobService::class.java))
         .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPersisted(true)
@@ -25,30 +25,32 @@ object SyncScheduler {
             jobs.schedule(builder(context, PERIODIC).setPeriodic(15 * 60 * 1000L).build()) == JobScheduler.RESULT_SUCCESS
     }
 
-    fun scheduleSms(context: Context): Boolean {
-        // Independent ID: an ordinary pending/running heartbeat must not suppress SMS urgency.
+    fun scheduleSms(context: Context) = scheduleIncoming(context)
+
+    fun scheduleIncoming(context: Context): Boolean {
+        // Independent ID: an ordinary pending/running heartbeat must not suppress incoming-event urgency.
         val periodic = ensurePeriodic(context)
-        val immediate = smsDispatch.request { enqueueSms(context) }
-        if (!immediate || !periodic) SyncDiagnostics.record(SyncDiagnostics.Phase.SMS_SCHEDULE_REJECTED)
+        val immediate = incomingDispatch.request { enqueueIncoming(context) }
+        if (!immediate || !periodic) SyncDiagnostics.record(SyncDiagnostics.Phase.INCOMING_SCHEDULE_REJECTED)
         return immediate && periodic
     }
 
-    private fun enqueueSms(context: Context): Boolean {
+    private fun enqueueIncoming(context: Context): Boolean {
         val jobs = context.getSystemService(JobScheduler::class.java)
-        return scheduleSmsWithFallback({
-            val accepted = jobs.schedule(builder(context, SMS).setExpedited(true).build()) == JobScheduler.RESULT_SUCCESS
-            if (!accepted) SyncDiagnostics.record(SyncDiagnostics.Phase.SMS_EXPEDITED_REJECTED)
+        return scheduleIncomingWithFallback({
+            val accepted = jobs.schedule(builder(context, INCOMING).setExpedited(true).build()) == JobScheduler.RESULT_SUCCESS
+            if (!accepted) SyncDiagnostics.record(SyncDiagnostics.Phase.INCOMING_EXPEDITED_REJECTED)
             accepted
         }, {
-            jobs.schedule(builder(context, SMS).build()) == JobScheduler.RESULT_SUCCESS
+            jobs.schedule(builder(context, INCOMING).build()) == JobScheduler.RESULT_SUCCESS
         })
     }
 
-    internal fun started(id: Int) { if (id == SMS) smsDispatch.started() }
-    internal fun stopped(id: Int) { if (id == SMS) smsDispatch.stopped() }
+    internal fun started(id: Int) { if (id == INCOMING) incomingDispatch.started() }
+    internal fun stopped(id: Int) { if (id == INCOMING) incomingDispatch.stopped() }
     internal fun finished(id: Int, retry: Boolean, finish: (Boolean) -> Unit) {
-        if (id != SMS) { finish(retry); return }
-        smsDispatch.finished(retry, finish)
+        if (id != INCOMING) { finish(retry); return }
+        incomingDispatch.finished(retry, finish)
     }
 
     fun schedule(context: Context): Boolean {
@@ -60,8 +62,9 @@ object SyncScheduler {
     }
     fun cancel(context: Context) {
         HeartbeatAlarm.cancel(context)
+        dev.simlink.gateway.calls.CallCaptureScheduler.cancel(context)
         val jobs = context.getSystemService(JobScheduler::class.java)
-        jobs.cancel(IMMEDIATE); jobs.cancel(PERIODIC); jobs.cancel(SMS)
+        jobs.cancel(IMMEDIATE); jobs.cancel(PERIODIC); jobs.cancel(INCOMING)
     }
 }
 class UploadJobService : JobService() {

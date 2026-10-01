@@ -5,7 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** Schema owner. Opening a P0 database preserves messages and never enrolls historical SMS. */
-class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "gateway.db", null, 5) {
+class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "gateway.db", null, 6) {
     init { setWriteAheadLoggingEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE messages (id TEXT PRIMARY KEY, address TEXT NOT NULL, body TEXT NOT NULL, sub_id INTEGER NOT NULL, time INTEGER NOT NULL, outgoing INTEGER NOT NULL, interrupted INTEGER NOT NULL DEFAULT 0)")
@@ -14,12 +14,19 @@ class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(c
         createSimTables(db)
         createIdentity(db)
         createCommands(db)
+        createCalls(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createSyncTables(db)
         if (oldVersion < 3) createSimTables(db)
         if (oldVersion < 4) createIdentity(db)
         if (oldVersion < 5) createCommands(db)
+        if (oldVersion < 6) createCalls(db)
+    }
+    private fun createCalls(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE call_settings(generation TEXT PRIMARY KEY,enabled INTEGER NOT NULL,since_at INTEGER NOT NULL,cursor INTEGER NOT NULL,checked_at INTEGER,notice TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE call_events(event_id TEXT PRIMARY KEY,generation TEXT NOT NULL,source_id INTEGER NOT NULL,number TEXT,outcome TEXT NOT NULL,started_at INTEGER NOT NULL,duration_seconds INTEGER NOT NULL,state TEXT NOT NULL DEFAULT 'pending',UNIQUE(generation,source_id,started_at))")
+        db.execSQL("CREATE INDEX call_events_pending ON call_events(generation,state)")
     }
     private fun createCommands(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE remote_commands(command_id TEXT PRIMARY KEY,generation TEXT NOT NULL,claim_id TEXT NOT NULL,rejection TEXT,last_report TEXT)")

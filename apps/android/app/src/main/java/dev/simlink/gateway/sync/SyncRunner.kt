@@ -25,6 +25,7 @@ class SyncRunner(private val context: Context) {
     private fun runExclusive(cancellation: RequestCancellation, heartbeatAlreadySent: Boolean): Boolean {
         SyncDiagnostics.record(SyncDiagnostics.Phase.SYNC_STARTED)
         val connection = connections.current() ?: return false
+        dev.simlink.gateway.calls.CallCaptureScheduler.wake(context)
         if (!BuildConfig.DEBUG && connection.server.startsWith("http:")) {
             connections.pause(connection.generation, "发布版只允许 HTTPS，请重新配对")
             return false
@@ -43,7 +44,7 @@ class SyncRunner(private val context: Context) {
             override fun notice(generation: String, notice: String) = connections.notice(generation, notice)
         }
         var inventorySupported = false
-        return SyncEngine(storage, { event, token ->
+        val smsRetry = SyncEngine(storage, { event, token ->
             val body = JSONObject().put("eventId", event.id).put("sender", event.address).put("body", event.body)
                 .put("subscriptionId", if (event.subId >= 0) event.subId else JSONObject.NULL).put("receivedAt", event.time)
             if (event.simKey != null) {
@@ -85,6 +86,8 @@ class SyncRunner(private val context: Context) {
                 inventorySupported = true
                 dev.simlink.gateway.commands.RemoteCommands(context,api,cancellation).run(connection,token)
             } catch (error: ApiFailure) { throw UploadFailure(error.status, error.hasRetryAfter) }
-        }).run()
+        }, maxEvents = if (dev.simlink.gateway.calls.CallStore(context).pending(connection.generation) > 0) 8 else 40).run()
+        val callsRetry = dev.simlink.gateway.calls.CallSync(context).run(connection,api,cancellation)
+        return smsRetry || callsRetry
     }
 }

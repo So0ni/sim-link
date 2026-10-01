@@ -1,7 +1,7 @@
 package dev.simlink.gateway.sync
 
-/** Serialize SMS requests with job completion so arrivals at the end of a run are not lost. */
-internal class SmsSyncDispatch {
+/** Serialize incoming-event requests with job completion so arrivals at the end of a run are not lost. */
+internal class IncomingSyncDispatch {
     private var running = false
     private var requested = false
 
@@ -27,5 +27,5 @@ internal class SmsSyncDispatch {
 }
 
 /** A rejected expedited request must still register durable ordinary work. */
-internal fun scheduleSmsWithFallback(expedited: () -> Boolean, ordinary: () -> Boolean): Boolean =
+internal fun scheduleIncomingWithFallback(expedited: () -> Boolean, ordinary: () -> Boolean): Boolean =
     expedited() || ordinary()

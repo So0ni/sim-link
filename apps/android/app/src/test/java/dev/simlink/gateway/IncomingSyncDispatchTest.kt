@@ -1,21 +1,21 @@
 package dev.simlink.gateway
 
-import dev.simlink.gateway.sync.SmsSyncDispatch
-import dev.simlink.gateway.sync.scheduleSmsWithFallback
+import dev.simlink.gateway.sync.IncomingSyncDispatch
+import dev.simlink.gateway.sync.scheduleIncomingWithFallback
 import org.junit.Assert.*
 import org.junit.Test
 
-class SmsSyncDispatchTest {
+class IncomingSyncDispatchTest {
     @Test fun quotaRejectionFallsBackAndReportsTotalFailure() {
         var ordinary = 0
-        assertTrue(scheduleSmsWithFallback({ false }, { ordinary++; true }))
+        assertTrue(scheduleIncomingWithFallback({ false }, { ordinary++; true }))
         assertEquals(1, ordinary)
-        assertFalse(scheduleSmsWithFallback({ false }, { false }))
-        assertTrue(scheduleSmsWithFallback({ true }, { error("Unneeded fallback") }))
+        assertFalse(scheduleIncomingWithFallback({ false }, { false }))
+        assertTrue(scheduleIncomingWithFallback({ true }, { error("Unneeded fallback") }))
     }
 
     @Test fun smsAfterFinalQueueReadRequestsRetryWithoutCancellingRunningUpload() {
-        val dispatch = SmsSyncDispatch()
+        val dispatch = IncomingSyncDispatch()
         assertTrue(dispatch.request { true })
         dispatch.started()
         repeat(3) { assertTrue(dispatch.request { error("Must not replace running upload") }) }
@@ -28,7 +28,7 @@ class SmsSyncDispatchTest {
     }
 
     @Test fun networkFailureRetainsRetryAndNewSmsCanPromotePendingWork() {
-        val dispatch = SmsSyncDispatch()
+        val dispatch = IncomingSyncDispatch()
         dispatch.started()
         dispatch.finished(true) { assertTrue(it) }
         var scheduled = false
@@ -37,7 +37,7 @@ class SmsSyncDispatchTest {
     }
 
     @Test fun stoppedJobAllowsNextSmsToRequestScheduling() {
-        val dispatch = SmsSyncDispatch()
+        val dispatch = IncomingSyncDispatch()
         dispatch.started()
         dispatch.request { error("Already running") }
         dispatch.stopped()

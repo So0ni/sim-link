@@ -83,6 +83,11 @@ export function createPushService(db, now, origin, send = sendNotification) {
       const subs = db.prepare('SELECT p.id FROM push_subscriptions p JOIN sessions s ON p.session_id=s.id WHERE s.expires_at>?').all(now());
       for (const sub of subs) enqueue(sub,`message:${sequence}`,url,Math.min(now()+HOUR,message.receivedAt+HOUR),message.sender);
     },
+    enqueueCall(sequence, deviceId, call) {
+      if (call.outcome !== 'missed' || call.startedAt < now()-HOUR) return;
+      const subs = db.prepare('SELECT p.id FROM push_subscriptions p JOIN sessions s ON p.session_id=s.id WHERE s.expires_at>?').all(now());
+      for (const sub of subs) enqueue(sub,`call:${sequence}`,`/#/calls/${sequence}`,Math.min(now()+HOUR,call.startedAt+HOUR),'');
+    },
     drain() {
       if (running) return running;
       running = (async () => {
@@ -102,7 +107,7 @@ export function createPushService(db, now, origin, send = sendNotification) {
               ? db.prepare('SELECT body FROM messages WHERE sequence=?').get(Number(job.event_key.slice(8))) : null;
             const preview = message ? messagePreview(message.body,job.preview_length) : '';
             await send({endpoint:job.endpoint,keys:{p256dh:job.p256dh,auth:job.auth}},JSON.stringify({
-              ...(preview ? {preview} : {}),jobId:job.id,title:'SIMLink',body:job.event_key.startsWith('test:')?'SIMLink 测试：通知已开启。':`${job.sender} 发来一条短信`,url:job.url,tag:job.event_key,sessionId:job.session_id,
+              ...(preview ? {preview} : {}),jobId:job.id,title:'SIMLink',body:job.event_key.startsWith('call:')?'收到一通未接来电，点击查看。':job.event_key.startsWith('test:')?'SIMLink 测试：通知已开启。':`${job.sender} 发来一条短信`,url:job.url,tag:job.event_key,sessionId:job.session_id,
             }),{TTL:Math.max(1,Math.floor((job.expires_at-now())/1000)),timeout:10000,urgency:'high',
               vapidDetails:{subject:origin,publicKey:identity.public_key,privateKey:identity.private_key}});
             db.prepare("UPDATE push_jobs SET state='accepted',result='accepted',accepted_at=? WHERE id=?").run(now(),id);

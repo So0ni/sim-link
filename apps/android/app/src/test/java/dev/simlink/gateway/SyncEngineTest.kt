@@ -19,6 +19,14 @@ class SyncEngineTest {
         override fun pause(generation: String, notice: String) { enabled = false }
         override fun notice(generation: String, notice: String) {}
     }
+    @Test fun boundedSmsBatchLeavesRoomForOtherEventTypesWithoutLosingRetry() {
+        val store = Memory()
+        repeat(19) { store.pending.add(UploadEvent("extra-$it", "Example", "Fictional", 1, 1000)) }
+        val retry = SyncEngine(store, { event, _ -> UploadAck(event.id, 1, 1000) }, { false }, maxEvents = 8).run()
+        assertTrue(retry)
+        assertEquals(8, store.acknowledged.size)
+        assertEquals(12, store.pending.size)
+    }
     @Test fun lostAckRetriesSameEventWithoutPrematureCompletion() {
         val store = Memory(); val ids = mutableListOf<String>()
         var loseResponse = true

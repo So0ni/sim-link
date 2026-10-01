@@ -20,7 +20,8 @@ interface SyncStorage {
 class SyncEngine(private val storage: SyncStorage,
                  private val upload: (UploadEvent, String) -> UploadAck,
                  private val cancelled: () -> Boolean,
-                 private val heartbeat: (String) -> Unit = {}) {
+                 private val heartbeat: (String) -> Unit = {},
+                 private val maxEvents: Int = 40) {
     fun run(): Boolean {
         val config = storage.target() ?: return false
         if (!config.enabled) return false
@@ -37,7 +38,7 @@ class SyncEngine(private val storage: SyncStorage,
             // Older API v1 servers have no heartbeat route; SMS upload remains compatible.
             heartbeatRetry = error.status != 404
         } catch (_: Exception) { heartbeatRetry = true }
-        repeat(40) {
+        repeat(maxEvents) {
             if (cancelled()) return true
             if (storage.currentGeneration() != config.generation) return false
             val event = storage.next(config.generation) ?: return heartbeatRetry

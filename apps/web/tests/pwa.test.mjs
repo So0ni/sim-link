@@ -117,6 +117,8 @@ test('push shows sender only for the bound live session; offline fallback is pri
   response=new Error('offline');payload.preview='FICTIONAL PRIVATE PREVIEW';await fire('push',{data:{json:()=>payload}});assert.equal(shown[1][0],'新通知');assert.ok(!JSON.stringify(shown[1]).includes(payload.preview));assert.ok(!shown[1][1].body.includes('12025550123'));assert.equal(shown[1][1].data.url,'/#/inbox');
   await fire('notificationclick',{notification:{close(){},data:{url:payload.url}}});assert.equal(opened[0],'https://sim.test'+payload.url);
   for(const url of ['https://evil.test/','/api/v1/auth/logout','/#/send'])await fire('notificationclick',{notification:{close(){},data:{url}}});assert.equal(opened.length,1);
+  await fire('notificationclick',{notification:{close(){},data:{url:'/#/calls/7'}}});assert.equal(opened[1],'https://sim.test/#/calls/7');
+  await fire('notificationclick',{notification:{close(){},data:{url:'/#/calls/javascript:bad'}}});assert.equal(opened.length,2);
 });
 
 test('slow session check falls back privately without waiting for another push; badge failure never blocks display',async()=>{

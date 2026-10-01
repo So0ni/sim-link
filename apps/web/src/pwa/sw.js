@@ -108,7 +108,7 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil((async () => {
     let target;
     try { target = new URL(event.notification.data?.url || '/#/inbox', self.location.origin); } catch { return; }
-    if (target.origin !== self.location.origin || target.pathname !== '/' || !/^#\/(inbox(?:\/.*)?|settings)$/.test(target.hash)) return;
+    if (target.origin !== self.location.origin || target.pathname !== '/' || !/^#\/(inbox(?:\/.*)?|calls(?:\/\d+)?|settings)$/.test(target.hash)) return;
     const windows = await self.clients.matchAll({type:'window',includeUncontrolled:true});
     for (const client of windows) {
       if (new URL(client.url).origin === self.location.origin) {

@@ -11,7 +11,7 @@ export function openStore(path) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 11) {
+  if (version > 12) {
     db.close();
     throw new Error("Database is newer than this server");
   }
@@ -122,6 +122,15 @@ export function openStore(path) {
   if (version < 11) db.transaction(() => {
     db.exec(`ALTER TABLE push_subscriptions ADD COLUMN preview_length INTEGER NOT NULL DEFAULT 0 CHECK(preview_length BETWEEN 0 AND 200);
       PRAGMA user_version=11;`);
+  })();
+  if (version < 12) db.transaction(() => {
+    db.exec(`CREATE TABLE calls (sequence INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT NOT NULL,
+      event_id TEXT NOT NULL, number TEXT, outcome TEXT NOT NULL, started_at INTEGER NOT NULL,
+      duration_seconds INTEGER NOT NULL, sim_key TEXT, synced_at INTEGER NOT NULL, viewed_at INTEGER,
+      UNIQUE(device_id,event_id));
+      CREATE TABLE call_status (device_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL, permission INTEGER NOT NULL,
+      checked_at INTEGER, pending INTEGER NOT NULL, reported_at INTEGER NOT NULL);
+      PRAGMA user_version=12;`);
   })();
   return db;
 }

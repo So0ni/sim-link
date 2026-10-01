@@ -54,6 +54,7 @@ open class MainActivity : ComponentActivity() {
     private var paired = false
     private var syncEnabled = false
     private var serverAddress = "尚未连接"
+    private var callsOverview = ""
     private var connectionOverview = "正在读取服务器状态…"
     private val refresh = object : Runnable {
         override fun run() { loadRecords(); handler.postDelayed(this, 2000) }
@@ -108,6 +109,7 @@ open class MainActivity : ComponentActivity() {
     }
     override fun onResume() {
         super.onResume()
+        dev.simlink.gateway.calls.CallCaptureScheduler.wake(applicationContext)
         handler.removeCallbacks(refresh)
         handler.post(refresh)
         handler.removeCallbacks(commandPoll)
@@ -148,8 +150,11 @@ open class MainActivity : ComponentActivity() {
                 if (c == null) "尚未配对 · 短信仅保存在本机" else
                     "${if (c.enabled) "已配对" else "同步已暂停"} · ${c.server}\n${dev.simlink.gateway.sync.SyncQueue(applicationContext).summary(c.generation)}\n${c.notice}"
             }.getOrDefault("无法读取连接状态，请检查本机存储")
+            val callSummary = runCatching { dev.simlink.gateway.calls.CallStore(applicationContext).summary() }.getOrDefault("无法读取来电状态")
             handler.post {
                 if (isDestroyed || isFinishing) return@post
+                val callChanged = callsOverview != callSummary
+                callsOverview = callSummary
                 val connectionChanged = overview != connectionOverview
                 connectionOverview = overview
                 paired = currentConnection != null
@@ -158,7 +163,8 @@ open class MainActivity : ComponentActivity() {
                 val changed = result.getOrNull() != records || (result.isFailure != (loadError != null))
                 records = result.getOrDefault(records)
                 loadError = if (result.isFailure) "无法读取本地记录，请检查手机存储空间。" else null
-                if (page in listOf("运行", "诊断") && connectionChanged) draw()
+                if (page in listOf("运行", "诊断") && (connectionChanged || callChanged)) draw()
+                if (page == "来电" && callChanged) draw()
                 if (page == "短信" && (changed || records.any { it.outgoing && it.results.any { r -> r == null } })) draw()
             }
         }
@@ -192,6 +198,7 @@ open class MainActivity : ComponentActivity() {
             "运行" -> statusPage(); "短信" -> messagesPage()
             "发送" -> if (BuildConfig.DEBUG) composePage() else settingsPage()
             "权限" -> setupPages().permissionsPage(); "后台" -> setupPages().backgroundPage(); "SIM" -> setupPages().simsPage()
+            "来电" -> CallSettingsPage(this,content,gatewayStyle).draw()
             "诊断" -> diagnosticsPage(); else -> settingsPage()
         }
         if (subpage) return
@@ -250,6 +257,7 @@ open class MainActivity : ComponentActivity() {
         availableSims.forEach { row(R.drawable.ic_sim_card,"SIM ${it.simSlotIndex + 1}",it.displayName.toString()) { navigate("SIM") } }
         section("运行条件")
         row(R.drawable.ic_verified_user,"短信与 SIM 权限",if (needsPermission) "需要设置" else "已授予") { navigate("权限") }
+        row(R.drawable.ic_sync,"来电同步",dev.simlink.gateway.calls.CallStore(this).summary()) { navigate("来电") }
         row(R.drawable.ic_battery_full,"后台运行",batterySummary()) { navigate("后台") }
     }
     private fun batterySummary() = if (getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)) "系统电池优化已豁免" else "系统电池优化已启用"
@@ -341,6 +349,7 @@ open class MainActivity : ComponentActivity() {
         title("设置")
         section("网关")
         row(R.drawable.ic_dns,"服务器与同步","连接、修改地址与解除配对") { connection() }
+        row(R.drawable.ic_sync,"来电同步","权限、新来电采集与同步状态") { navigate("来电") }
         row(R.drawable.ic_sim_card,"SIM 卡","查看此设备中的卡片") { navigate("SIM") }
         section("运行条件")
         row(R.drawable.ic_verified_user,"短信与 SIM 权限","管理网关需要的访问权限") { navigate("权限") }

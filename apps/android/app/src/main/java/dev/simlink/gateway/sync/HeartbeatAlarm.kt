@@ -67,6 +67,7 @@ class HeartbeatReceiver : BroadcastReceiver() {
                 if (!BuildConfig.DEBUG && connection.server.startsWith("http:")) return@execute
                 val token = connection.token()
                 if (store.current()?.generation != connection.generation || cancellation.stopped.get()) return@execute
+                dev.simlink.gateway.calls.CallCaptureScheduler.wake(app)
                 // First establish contact, then use the remaining wake window for full sync.
                 GatewayApi(connection.server, cancellation, allowHttp = BuildConfig.DEBUG).heartbeat(token)
                 SyncDiagnostics.record(SyncDiagnostics.Phase.HEARTBEAT_OK)

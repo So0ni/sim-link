@@ -77,5 +77,7 @@ class GatewayApi(private val server: String, private val cancellation: RequestCa
         try { check(request("/api/v1/device/unpair", JSONObject(), token).getBoolean("ok")) }
         catch (error: ApiFailure) { if (error.status != 401) throw error } // Already revoked / lost successful response.
     }
+    fun uploadCall(body: JSONObject, token: String) = request("/api/v1/device/calls",body,token)
+    fun callStatus(body: JSONObject, token: String) { check(request("/api/v1/device/calls/status",body,token).getBoolean("ok")) }
     fun upload(body: JSONObject, token: String): JSONObject = request("/api/v1/device/messages", body, token)
 }

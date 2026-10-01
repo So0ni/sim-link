@@ -72,3 +72,7 @@ SIM inventory and immutable message mapping: [SIM-MAPPING.md](SIM-MAPPING.md). A
 ### P2 远程发送
 
 API新增 `modules/commands`，负责SQLite v6的持久命令、幂等、条件领取/取消与分段结果合并。Web `features/send` 使用同源API，发件记录与收件阅读游标分离；草稿仅内存。Android `commands` 处理当前配对的显式发送开关、持久领取游标和一次性执行记录，调用既有telephony/SmsSender；GatewayDatabase v5保留旧数据。SyncRunner复用网络执行器汇报/领取，前台15秒检查，后台不承诺即时性。无新常驻服务或依赖；旧Android兼容收件，新客户端遇旧服务端发送路由404跳过。
+
+### 新来电同步
+
+后端 `modules/calls` 的 service 拥有数据事务、routes 拥有 HTTP schema/认证，推送仍由 push 模块处理。Web `features/calls` 分为 API 类型/请求、纯合并模型、轮询 hook、页面与局部样式。Android `calls` 拥有系统记录采集、持久进度和事件上传；`sync` 保留唯一完整同步入口与共用 incoming-event 加急任务；UI 留在 `ui/CallSettingsPage`。不把来电伪装成短信，不增加网络常驻服务或第二套心跳。来电读取不依赖网络，心跳总窗口保持原限制。行为/兼容与字段见 [CALLS](CALLS.md)。

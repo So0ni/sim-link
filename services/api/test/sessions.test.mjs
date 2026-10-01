@@ -60,7 +60,7 @@ test('v8 sessions migrate without invented login dates; resume persists and neve
   await initializeAdmin(db,password);
   let stamp=100000;let auth=createAuthService(db,()=>stamp);
   const raw=await auth.login(password,'Firefox/130');
-  db.exec('ALTER TABLE push_subscriptions DROP COLUMN preview_length; ALTER TABLE push_jobs DROP COLUMN accepted_at; ALTER TABLE push_jobs DROP COLUMN worker_received_at; ALTER TABLE push_jobs DROP COLUMN notification_shown_at; DROP TABLE session_details; PRAGMA user_version=8;');db.close();
+  db.exec('ALTER TABLE push_subscriptions DROP COLUMN preview_length; ALTER TABLE push_jobs DROP COLUMN accepted_at; ALTER TABLE push_jobs DROP COLUMN worker_received_at; ALTER TABLE push_jobs DROP COLUMN notification_shown_at; DROP TABLE session_details; DROP TABLE calls; DROP TABLE call_status; PRAGMA user_version=8;');db.close();
   db=openStore(path);auth=createAuthService(db,()=>stamp);
   const session=auth.read(raw);
   assert.equal(auth.list(session.id)[0].createdAt,null);

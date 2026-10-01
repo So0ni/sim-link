@@ -1,10 +1,11 @@
+import { CallsPage } from "../features/calls/CallsPage.tsx";
 import { useBadge } from "../pwa/useBadge.ts";
 import { SessionSettings } from "../features/auth/SessionSettings.tsx";
 import { PushSettings } from '../features/push/PushSettings.tsx';
 import { PageBrand } from "../shared/ui/PageBrand.tsx";
 import { VIEW_CACHE_KEY } from "../shared/api/viewCache.ts";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { EnvelopeSimple, HardDrives, GearSix } from "@phosphor-icons/react";
+import { Phone, EnvelopeSimple, HardDrives, GearSix } from "@phosphor-icons/react";
 import { ApiClient, errorText } from "../shared/api/client.ts";
 import { SessionController } from "../features/auth/session.ts";
 import { PwaSettings } from "../pwa/PwaControls.tsx";
@@ -78,7 +79,7 @@ export function App() {
         </div>
       </main>
     );
-  const page = path.startsWith("/send") ? "send" : path.startsWith("/devices")
+  const page = path.startsWith("/calls") ? "calls" : path.startsWith("/send") ? "send" : path.startsWith("/devices")
     ? "devices"
     : path.startsWith("/settings")
       ? "settings"
@@ -93,6 +94,7 @@ export function App() {
   }
   const links = [
     ["inbox", "短信", EnvelopeSimple],
+    ["calls", "来电", Phone],
     ["devices", "设备", HardDrives],
     ["settings", "设置", GearSix],
   ] as const;
@@ -120,6 +122,7 @@ export function App() {
       </aside>
       <SendPage api={auth.api} path={path} visible={page === "send"} onSent={command=>go(`/inbox/${encodeURIComponent(JSON.stringify([command.deviceId,command.simKey,command.recipient]))}`)} />
       <InboxPage api={auth.api} selected={selected} go={go} visible={page==="inbox"} />
+      {page === "calls" && <CallsPage api={auth.api} path={path} />}
       {page === "devices" && <DevicesPage api={auth.api} />}
       {page === "settings" && (
         <main className="main live-page">

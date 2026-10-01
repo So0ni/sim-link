@@ -190,7 +190,7 @@ test('v1 migration removes revoked devices without losing SMS IDs or active cred
   db.close();
   const migrated = openStore(path);
   try {
-    assert.equal(migrated.pragma('user_version',{simple:true}),11);
+    assert.equal(migrated.pragma('user_version',{simple:true}),12);
     assert.deepEqual(migrated.prepare('SELECT id,token_hash,last_seen_at FROM devices').all(),[{id:'live',token_hash:'hash-live',last_seen_at:null}]);
     assert.equal(migrated.prepare('SELECT device_id FROM messages WHERE sequence=7').get().device_id,'old');
     assert.deepEqual(migrated.prepare('SELECT is_read,read_version FROM messages WHERE sequence=7').get(), {is_read:0,read_version:0});

@@ -187,3 +187,26 @@ SQLite v9 新增独立会话元数据表；旧会话保留有效凭证，未记�
 SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、VAPID、订阅、队列、会话；升级前一致性备份。旧服务器拒绝打开v10，回滚需配合备份恢复，不能只更换镜像。
 
 通信状态展示补充（2026-10-01）：presence 的 online/offline/unknown 字段及 35 分钟阈值不变；PWA 将 offline 显示为“长时间未通信”，不是已证实网络断开。独立心跳唤醒继续使用原 POST /device/heartbeat，不修改短信及命令契约。
+
+## 新来电同步（2026-10-02，SQLite v12）
+
+发现能力新增 `calls.receive.v1`。旧接口不变；推荐服务端先升级。Android 首版 simKey 固定 null，后续验证映射后再提供。
+
+设备 Bearer `POST /api/v1/device/calls`，全部字段必填：
+
+```json
+{"eventId":"fictional-call-1","number":"+12025550147","outcome":"missed","startedAt":1000,"durationSeconds":0,"simKey":null}
+```
+
+`eventId` 1–128 字符；number 为 null 或 1–256 字符；outcome 为 incoming/missed/rejected/blocked；startedAt 非负安全整数毫秒（不得超过服务端时间 5 分钟）；durationSeconds 为 0–31536000 整数；simKey 为 null 或 36 字符 UUID 形状字符串。结果 `{eventId,sequence,syncedAt,duplicate}`；按 deviceId/eventId 唯一，所有业务字段参与冲突比较，同内容重放返回原 ACK，变化 409 event_conflict。事务提交后 ACK，并在同一事务内按时效为新 missed 创建私密推送任务。
+
+设备 Bearer `POST /api/v1/device/calls/status`：`{enabled:boolean,permission:boolean,checkedAt:number|null,pending:number}`，checkedAt 非负毫秒，不得超过服务器 5 分钟，pending 非负安全整数；返回 `{ok:true}`。状态为最近上报快照，不代表实时可用。未上报与 false 不混淆。
+
+浏览器 Cookie：
+
+- `GET /api/v1/calls?before=<cursor>`：按 sequence 倒序每页最多 100，省略 before 从最新上传开始。返回 `{calls,nextCursor}`，尾页 nextCursor=null。每条含 sequence/deviceId/eventId/number/outcome/startedAt/durationSeconds/simKey/syncedAt/viewedAt；Web 按 startedAt 排序已加载记录。
+- `GET /api/v1/calls/:id`：单条详情，未知 404 call_not_found。
+- `POST /api/v1/calls/:id/view`：Cookie + Origin/CSRF；只将首次 viewedAt 写为服务端当前时间，重复幂等，不修改通话结果；返回 `{ok:true}`。
+- `GET /api/v1/calls/status`：`{devices:[{deviceId,name,enabled,permission,checkedAt,pending,reportedAt}]}`；enabled/permission 为 0/1，未上报字段为 null。
+
+网络错误保留队列；400/409 阻塞单条，401/403 停止连接，旧服务端 404 保留来电队列但不影响短信。来电权限拒绝仅禁用系统记录读取。历史来电在设备撤销后保留，凭证立即失效。通知、查看状态、系统通话结果、设备心跳互不推断。详情见 [来电设计](CALLS.md)。

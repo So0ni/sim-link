@@ -1,3 +1,5 @@
+import { createCallsService } from "./modules/calls/service.mjs";
+import { registerCallsRoutes } from "./modules/calls/routes.mjs";
 import { trustedProxies } from "./platform/trusted-proxies.mjs";
 import { createLoginLimit } from "./modules/auth/login-limit.mjs";
 import { createPushService } from './modules/push/service.mjs';
@@ -72,6 +74,7 @@ export function createApp({
     sessions: createSessionPolicy(auth, origin),
     rate,
     devices: createDeviceService(db, now, origin),
+    calls: createCallsService(db, now, push.enqueueCall),
     inbox: createInboxService(db, now, push.enqueueMessage),
     sims: createSimService(db, now),
     commands: createCommandService(db, now),
@@ -89,6 +92,7 @@ export function createApp({
   registerAuthRoutes(app, dependencies);
   registerDeviceRoutes(app, dependencies);
   registerInboxRoutes(app, dependencies);
+  registerCallsRoutes(app, dependencies);
   registerSimRoutes(app, dependencies);
   registerCommandRoutes(app, dependencies);
   app.get("/healthz", async () => {
@@ -100,7 +104,7 @@ export function createApp({
     apiVersion: 1,
     serverVersion: "0.1.0",
     serverId: dependencies.devices.serverId,
-    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory", "device.identity", "sms.send.v1"],
+    capabilities: ["sms.receive", "device.heartbeat", "device.unpair", "sim.inventory", "device.identity", "sms.send.v1", "calls.receive.v1"],
   }));
   return app;
 }
