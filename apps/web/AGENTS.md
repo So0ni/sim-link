@@ -8,3 +8,4 @@
 - 保留 .openai/hosting.json、worker/index.js、scripts/prepare-sites-build.mjs、tests/sites-worker.test.mjs 的模板部署兼容能力；未经用户要求不发布。
 
 - 生产构建由 scripts/pwa-build.mjs 生成带内容版本的 Service Worker，仅预缓存静态白名单；API、带查询参数请求及写请求不进入 Cache Storage。开发和 demo 不注册 Worker；改缓存策略须运行 npm test 中的 PWA 隔离测试。
+- 来电页面集中于 features/calls，独立管理 API、轮询与页面状态；来电数据仅存内存。查看标记不得改变通话结果或被旧轮询撤销，来电不计入短信未读角标。拨号链接交由当前设备确认，通知点击路径须通过同源白名单；行为见 [来电规格](../../docs/CALLS.md)。

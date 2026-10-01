@@ -126,3 +126,5 @@ adb -s DEVICE_SERIAL logcat -v time -s SIMLinkSync:I '*:S'
 先升级后端至含 calls.receive.v1 的 v12 schema，再安装新版 APK，保留配对和短信。设置 → 来电同步，正常授权通话记录和电话状态后主动启用；受限制权限无法授予时记录机型/安装器结果，不绕过。仅采集本次启用后的来电；关闭后保留已采集数据，重新启用继续上传原队列，但不补采关闭期间的来电。SIM 归属首版显示未知。
 
 无网络的 Job 105 负责采集，系统 IDLE 广播触发延后/有限重查；现有启动、同步与心跳唤醒也补查。短信与来电共用任务 103（诊断阶段改为 INCOMING_SCHEDULE_REJECTED / INCOMING_EXPEDITED_REJECTED），队列与业务结构独立。来电权限/旧服务端接口故障不阻塞短信；UI 展示最近检查和待上传状态。构建命令不变。详见 [设计](../../docs/CALLS.md)、[模拟器验收及真机缺口](../../docs/CALLS-ACCEPTANCE.md)。
+
+0.5.0-calls/code14 已覆盖安装至 Android 16 真机；安装成功不代表来电权限或自然后台采集已通过。模拟器证据、发布检查与真机缺口统一记录在上述验收文档中。

@@ -26,10 +26,16 @@
 
 ## P1 工程边界
 
-按 ui / connection / sync / telephony / data / platform 分包，详见 [同步架构](docs/P1-SYNC.md)。SyncEngine 必须可在 JVM 独立测试；UI/receiver 不直接执行上传，网络任务不得占用 LocalIo 收件执行器。保留根包旧组件名薄适配，避免升级破坏 launcher 与已有回执 PendingIntent。
+按 ui / connection / sync / telephony / calls / commands / data / platform 分包，详见 [同步架构](docs/P1-SYNC.md)。SyncEngine 必须可在 JVM 独立测试；UI/receiver 不直接执行上传，网络任务不得占用 LocalIo 收件执行器。保留根包旧组件名薄适配，避免升级破坏 launcher 与已有回执 PendingIntent。
 
 同一事务保存新收件和 outbox，事件绑定配对 generation。经过原凭证验证的地址迁移保留 generation；恢复绑定仅在已知 serverId 与 deviceId 均相同时保留旧队列，其他配对不得自动迁移。仅匹配 ACK 后标记同步；上传重试不等于重发实体短信。Debug 可显式允许内网 HTTP，Release 仍为 HTTPS，禁止证书绕过。真机测试前先让用户确认服务器地址和上传范围。
 
 ## P2 执行边界
 
 commands模块只在当前配对主动启用且权限满足时领取。领取请求键必须先持久化，命令执行记录与游标推进使用同一事务；保留记录后无论崩溃或网络错误均不得再次调用SmsManager。调度仅重试领取/报告。发送前校验逻辑SIM及基于服务端剩余有效期的单调时钟截止时间，分段回执不推断送达。
+
+## 来电工程边界
+
+calls 模块负责系统记录采集、独立队列与上传，UI 仅展示状态和执行用户设置。PHONE_STATE 广播只安排检查，不把广播次数或携带号码当作业务记录；采集可离线落盘，不占用短信 LocalIo。网络上传复用现有同步门闩、设备凭证与调度入口，不为来电另建心跳或延长唤醒锁。
+
+启用起点、采集游标和事件绑定当前配对 generation；新事件与游标同事务保存，匹配 ACK 后才完成。保持权限拒绝、服务端不支持来电时的短信路径可用。类型映射、去重与兼容行为见 [来电规格](../../docs/CALLS.md)，不根据时长猜测未接或根据电话账户 ID 猜测 SIM。
