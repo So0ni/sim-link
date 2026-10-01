@@ -4,7 +4,6 @@ import { PageBrand } from "../../shared/ui/PageBrand.tsx";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Copy,
   EnvelopeSimple,
 } from "@phosphor-icons/react";
 import type { ApiClient } from "../../shared/api/client.ts";
@@ -40,7 +39,6 @@ export function InboxPage({
   const outgoing=useSendData(api,visible);
   const drafts=useRef(new Map<string,ReplyDraft>());
   const [sim, setSim] = useState("all");
-  const [copyResult, setCopyResult] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const tabs = simTabs(inbox.messages, inbox.sims);
   const allThreads=threads(inbox.messages,outgoing.commands);
@@ -166,27 +164,10 @@ export function InboxPage({
                     <p className="bubble">{m.body}</p>
                     <div className="message-meta">
                       <ConversationTime at={m.receivedAt} now={now} detail/>
-                      <button
-                        aria-label="复制短信正文"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(m.body);
-                            setCopyResult("已复制正文");
-                          } catch {
-                            setCopyResult("复制失败，请手动选择正文。");
-                          }
-                        }}
-                      >
-                        <Copy size={16} />
-                        复制
-                      </button>
                     </div>
                   </article>
                 );})())}
               </div>
-              <p role="status" className="field-help">
-                {copyResult}
-              </p>
             </div>
             <ConversationComposer key={active.id} api={api} draft={drafts.current.get(active.id)!} sim={originalSim} device={outgoing.devices.find(d=>d.id===active.anchor.deviceId)} sender={active.anchor.sender} onSent={command=>{outgoing.accept(command);const root=visibleReading.root.current;if(root&&activeId.current===active.id)requestAnimationFrame(()=>{root.scrollTop=root.scrollHeight;});}}/>
           </>
