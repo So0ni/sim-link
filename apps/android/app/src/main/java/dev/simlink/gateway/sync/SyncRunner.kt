@@ -19,7 +19,10 @@ object NetworkIo {
 class SyncRunner(private val context: Context) {
     private val connections = ConnectionStore(context)
     private val queue = SyncQueue(context)
-    fun run(cancellation: RequestCancellation): Boolean {
+    fun run(cancellation: RequestCancellation, heartbeatAlreadySent: Boolean = false): Boolean =
+        SyncRunGate.run { runExclusive(cancellation, heartbeatAlreadySent) }
+
+    private fun runExclusive(cancellation: RequestCancellation, heartbeatAlreadySent: Boolean): Boolean {
         SyncDiagnostics.record(SyncDiagnostics.Phase.SYNC_STARTED)
         val connection = connections.current() ?: return false
         if (!BuildConfig.DEBUG && connection.server.startsWith("http:")) {
@@ -74,7 +77,10 @@ class SyncRunner(private val context: Context) {
                     } catch (error: ApiFailure) { if (error.status != 404) throw error }
                     catch (_: org.json.JSONException) { /* Older server without identity capability. */ }
                 }
-                api.heartbeat(token)
+                try {
+                    if (!heartbeatAlreadySent) api.heartbeat(token)
+                    SyncDiagnostics.record(SyncDiagnostics.Phase.HEARTBEAT_OK)
+                } catch (error: Exception) { SyncDiagnostics.failure(error); throw error }
                 api.inventory(dev.simlink.gateway.telephony.SimInventory(context).refresh().json(), token)
                 inventorySupported = true
                 dev.simlink.gateway.commands.RemoteCommands(context,api,cancellation).run(connection,token)

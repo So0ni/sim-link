@@ -12,7 +12,7 @@ export function DeviceCard({device:d,sims,api,busy,saved,recover,revoke}:{device
     <header className="device-card-heading">
       <span className="device-icon" aria-hidden="true"><DeviceMobile size={24}/></span>
       <div className="device-identity"><h3>{d.name}</h3><p>最近联系：{d.lastSeenAt==null?'暂无记录':new Date(d.lastSeenAt).toLocaleString()}</p></div>
-      <span className={`device-presence ${online?'is-online':''}`}>{online?'近期在线':d.lastSeenAt!=null?'离线':'未联系'}</span>
+      <span className={`device-presence ${online?'is-online':''}`}>{online?'近期在线':d.lastSeenAt!=null?'长时间未通信':'未联系'}</span>
     </header>
     <div className="device-sims">
       <p className="device-sims-label">SIM 卡 <span>· 上次上报状态</span></p>
@@ -23,7 +23,7 @@ export function DeviceCard({device:d,sims,api,busy,saved,recover,revoke}:{device
     </div>
     <details className="device-management"><summary>设备详情与管理</summary>
       <dl><div><dt>设备编号</dt><dd>{d.id}</dd></div><div><dt>SIM 清单更新</dt><dd>{d.inventoryAt==null?'暂无记录':new Date(d.inventoryAt).toLocaleString()}</dd></div></dl>
-      <p className="field-help">近期在线表示 35 分钟内有联系，不保证此刻可达。</p>
+      <p className="field-help">近期在线表示 35 分钟内有通信；长时间未通信可能是省电休眠，不代表短信接收失效，也不保证此刻可达。</p>
       <div className="device-management-actions"><button disabled={busy} onClick={recover}>恢复绑定</button>{!d.revokedAt&&<button className="device-unpair" disabled={busy} onClick={()=>void revoke()}>解除配对</button>}</div>
     </details>
   </article>;

@@ -185,3 +185,5 @@ SQLite v9 新增独立会话元数据表；旧会话保留有效凭证，未记�
 推送payload新增非敏感随机`jobId`供诊断关联，旧Worker忽略新字段。新Worker遇summary404回退旧auth/session校验并不更新角标；旧服务不支持阶段回报时忽略回报失败。推荐先升级后端，再接受PWA更新；Android收件/发送接口不变，可独立升级。
 
 SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、VAPID、订阅、队列、会话；升级前一致性备份。旧服务器拒绝打开v10，回滚需配合备份恢复，不能只更换镜像。
+
+通信状态展示补充（2026-10-01）：presence 的 online/offline/unknown 字段及 35 分钟阈值不变；PWA 将 offline 显示为“长时间未通信”，不是已证实网络断开。独立心跳唤醒继续使用原 POST /device/heartbeat，不修改短信及命令契约。

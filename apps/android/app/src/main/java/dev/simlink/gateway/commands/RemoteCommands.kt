@@ -21,7 +21,7 @@ class RemoteSendSettings(private val context: Context) {
         .all { context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
 }
 
-/** NetworkIo serializes runners; SQLite reserves commands across process death and APK updates. */
+/** SyncRunGate serializes runners; SQLite reserves commands across process death and APK updates. */
 class RemoteCommands(private val context: Context, private val api: GatewayApi, private val cancellation: RequestCancellation) {
     private val db = GatewayDatabase.get(context).writableDatabase
     private val connections = ConnectionStore(context)

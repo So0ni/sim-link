@@ -19,6 +19,7 @@ object SyncScheduler {
         .setBackoffCriteria(30000, JobInfo.BACKOFF_POLICY_EXPONENTIAL)
 
     private fun ensurePeriodic(context: Context): Boolean {
+        HeartbeatAlarm.ensure(context)
         val jobs = context.getSystemService(JobScheduler::class.java)
         return jobs.getPendingJob(PERIODIC) != null ||
             jobs.schedule(builder(context, PERIODIC).setPeriodic(15 * 60 * 1000L).build()) == JobScheduler.RESULT_SUCCESS
@@ -58,6 +59,7 @@ object SyncScheduler {
         return ok
     }
     fun cancel(context: Context) {
+        HeartbeatAlarm.cancel(context)
         val jobs = context.getSystemService(JobScheduler::class.java)
         jobs.cancel(IMMEDIATE); jobs.cancel(PERIODIC); jobs.cancel(SMS)
     }
@@ -65,6 +67,7 @@ object SyncScheduler {
 class UploadJobService : JobService() {
     private val running = mutableMapOf<Int, RequestCancellation>()
     override fun onStartJob(params: JobParameters): Boolean {
+        SyncDiagnostics.job(params.jobId)
         SyncScheduler.started(params.jobId)
         SyncDiagnostics.record(if (params.isExpeditedJob) SyncDiagnostics.Phase.JOB_EXPEDITED_STARTED else SyncDiagnostics.Phase.JOB_STARTED)
         val cancellation = RequestCancellation()
@@ -81,6 +84,7 @@ class UploadJobService : JobService() {
         return true
     }
     override fun onStopJob(params: JobParameters): Boolean {
+        SyncDiagnostics.job(params.jobId, params.stopReason)
         running.remove(params.jobId)?.cancel()
         SyncScheduler.stopped(params.jobId)
         SyncDiagnostics.record(SyncDiagnostics.Phase.JOB_STOPPED)
