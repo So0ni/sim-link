@@ -10,15 +10,22 @@ import './calls.css';
 export function CallsPage({api,path}:{api:ApiClient;path:string}) {
   const {calls,devices,sims,error,loaded,before,filter,setFilter,busy,selectedId,selected,loadMore}=useCalls(api,path);
   const [notice,setNotice]=useState('');
+  const [missedOnly,setMissedOnly]=useState(false);
   const simLabel=(call:Call)=>{const sim=sims.find(s=>s.deviceId===call.deviceId&&s.simKey===call.simKey);return sim?simTitle(sim):'SIM 未知';};
-  const shown=calls.filter(c=>filter==='all'||filter==='missed'&&c.outcome==='missed'||filter==='unknown'&&c.simKey===null||filter===JSON.stringify([c.deviceId,c.simKey]));
+  const scoped=calls.filter(c=>filter==='all'||filter==='unknown'&&c.simKey===null||filter===JSON.stringify([c.deviceId,c.simKey]));
+  const missedCount=scoped.filter(c=>c.outcome==='missed').length;
+  const shown=scoped.filter(c=>!missedOnly||c.outcome==='missed');
   return <main className={`main live-page calls-page ${selectedId?'call-detail-open':''}`}>
     <PageBrand/><div className="title-row"><h1>来电</h1><span className="field-help">电话结束后同步</span></div>
-    <div className="sim-tabs" role="tablist" aria-label="来电筛选">{[['all','全部'],['missed','未接'],...(calls.some(c=>!c.simKey)?[['unknown','SIM 未知']]:[]),...sims.map(s=>[JSON.stringify([s.deviceId,s.simKey]),simTitle(s)])].map(([key,label])=><button key={key} role="tab" aria-selected={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+    <div className="sim-tabs live-tabs" role="group" aria-label="筛选 SIM">{[['all','全部'],...(calls.some(c=>!c.simKey)?[['unknown','SIM 未知']]:[]),...sims.map(s=>[JSON.stringify([s.deviceId,s.simKey]),simTitle(s)])].map(([key,label])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+    <div className="reading-filter" role="group" aria-label="筛选来电状态">
+      <button aria-pressed={!missedOnly} onClick={()=>setMissedOnly(false)}>全部</button>
+      <button aria-pressed={missedOnly} onClick={()=>setMissedOnly(true)}>未接 {missedCount}</button>
+    </div>
     {error&&<p role="alert" className="error">{error}</p>}
     <div className="calls-layout"><section className="calls-list" aria-label="来电记录">
       {!loaded&&!error&&<p role="status">正在读取来电…</p>}
-      {loaded&&shown.length===0&&<div className="call-empty"><Phone size={36}/><h2>暂无来电记录</h2><p>在 Android 设置中启用「来电同步」后，新来电会显示在这里。</p></div>}
+      {loaded&&shown.length===0&&<div className="call-empty"><Phone size={36}/><h2>{missedOnly?'没有未接来电':'暂无来电记录'}</h2><p>{missedOnly?'当前 SIM 范围内没有已加载的未接来电。':'在 Android 设置中启用「来电同步」后，新来电会显示在这里。'}</p>{missedOnly&&<button className="text-button" onClick={()=>setMissedOnly(false)}>查看全部</button>}</div>}
       {shown.map(c=><a key={c.sequence} href={`#/calls/${c.sequence}`} className={`call-row ${String(c.sequence)===selectedId?'selected':''}`} aria-current={String(c.sequence)===selectedId?'true':undefined}>
         <Phone size={24}/><div><strong>{c.number??'号码未提供'}</strong><p>{outcomeLabel[c.outcome]}{c.viewedAt===null?' · 未查看':''}</p><small>{new Date(c.startedAt).toLocaleString()} · {simLabel(c)}</small></div>
       </a>)}

@@ -41,10 +41,17 @@
   color: var(--dangerText);
   padding: 12px 0;
 }
-.live-tabs {
+.sim-tabs.live-tabs {
+  min-height: 48px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+.live-tabs::-webkit-scrollbar { display: none; }
 .live-tabs button {
+  min-height: 48px;
+  align-items: center;
+  padding-block: 10px;
   white-space: nowrap;
   flex-shrink: 0;
 }
