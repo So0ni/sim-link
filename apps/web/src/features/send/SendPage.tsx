@@ -1,3 +1,4 @@
+import { ConversationTime } from "../../shared/ui/ConversationTime.tsx";
 import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
 import { PageBrand } from "../../shared/ui/PageBrand.tsx";
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -7,11 +8,11 @@ import { listSims, simTitle, type Sim } from '../sims/api.ts';
 import { listDevices, type Device } from '../devices/api.ts';
 import { recipientNumber, reconcileSubmission, stateLabel, reasonLabel, type Command, type SendRequest } from './model.ts';
 
-export function CommandCard({command:c,api,refresh,compact=false}:{command:Command;api:ApiClient;refresh:()=>void;compact?:boolean}) {
+export function CommandCard({command:c,api,refresh,compact=false,now=Date.now()}:{command:Command;api:ApiClient;refresh:()=>void;compact?:boolean;now?:number}) {
   const [error,setError]=useState('');const [busy,setBusy]=useState(false);
   return <article className={compact?"message outgoing command-card chat-command":"live-card command-card"}>
     {!compact&&<strong>{c.recipient}</strong>}<p className={compact?"bubble":"command-body"}>{c.body}</p>
-    <p className={compact?"message-meta":undefined} role="status">{stateLabel[c.state] ?? c.state}</p>
+    <p className={compact?"message-meta":undefined} role="status">{compact&&<><ConversationTime at={c.createdAt} now={now} detail/> · </>}{stateLabel[c.state] ?? c.state}</p>
     {c.reason && <p>{reasonLabel[c.reason] ?? '请检查手机状态'}</p>}
     <details className="command-details"><summary>发送详情</summary><p className="field-help">提交：{new Date(c.createdAt).toLocaleString()} · 有效至 {new Date(c.expiresAt).toLocaleTimeString()}</p>
     {c.claimedAt && <p className="field-help">手机领取：{new Date(c.claimedAt).toLocaleString()}</p>}

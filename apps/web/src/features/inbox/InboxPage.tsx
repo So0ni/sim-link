@@ -1,6 +1,7 @@
+import { ConversationTime } from "../../shared/ui/ConversationTime.tsx";
 import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
 import { PageBrand } from "../../shared/ui/PageBrand.tsx";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Copy,
@@ -26,6 +27,15 @@ export function InboxPage({
   selected: string | null;
   go: (path: string) => void;
 }) {
+  const [now,setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!visible) return;
+    const update = () => { if (!document.hidden) setNow(Date.now()); };
+    update();
+    const timer = window.setInterval(update, 30000);
+    document.addEventListener('visibilitychange', update);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', update); };
+  }, [visible]);
   const inbox = useInbox(api,visible);
   const outgoing=useSendData(api,visible);
   const drafts=useRef(new Map<string,ReplyDraft>());
@@ -120,9 +130,7 @@ export function InboxPage({
                   <div className="row-content">
                     <div className="row-heading">
                       <strong>{last.sender}{unread > 0 && <span className="unread-label">未读 {unread}</span>}</strong>
-                      <time>
-                        {new Date(last.receivedAt).toLocaleDateString()}
-                      </time>
+                      <ConversationTime at={last.receivedAt} now={now}/>
                     </div>
                     <p>{last.body}</p>
                     <span className="sim-tag">{simLabel(last, inbox.sims)}</span>
@@ -153,11 +161,11 @@ export function InboxPage({
             </header>
             <div className="message-scroll" ref={visibleReading.root}>
               <div className="messages">
-                {active.timeline.map((item) => item.command ? <CommandCard key={item.id} command={item.command} api={api} refresh={()=>void outgoing.refresh()} compact/> : (()=>{const m=item.message!;return (
+                {active.timeline.map((item) => item.command ? <CommandCard key={item.id} command={item.command} api={api} refresh={()=>void outgoing.refresh()} compact now={now}/> : (()=>{const m=item.message!;return (
                   <article className="message" key={m.sequence} data-sequence={m.sequence}>
                     <p className="bubble">{m.body}</p>
                     <div className="message-meta">
-                      <time>{new Date(m.receivedAt).toLocaleString()}</time>
+                      <ConversationTime at={m.receivedAt} now={now} detail/>
                       <button
                         aria-label="复制短信正文"
                         onClick={async () => {
