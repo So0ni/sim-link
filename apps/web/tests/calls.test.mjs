@@ -11,3 +11,9 @@ test('dial links allow phone numbers and reject control sequences and non-phone 
  assert.equal(dialNumber('+1 (202) 555-0147'),'+12025550147');
  for(const value of [null,'','Anonymous','*123#','tel:123','123;456','javascript:alert(1)'])assert.equal(dialNumber(value),null);
 });
+
+test('stale polls cannot erase a repaired SIM mapping',()=>{
+ const known={sequence:1,startedAt:100,viewedAt:null,simKey:'sms-sim-key'};
+ assert.equal(mergeCalls([known],[{...known,simKey:null}])[0].simKey,'sms-sim-key');
+ assert.equal(mergeCalls([{...known,simKey:null}],[known])[0].simKey,'sms-sim-key');
+});

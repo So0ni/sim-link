@@ -3,6 +3,15 @@ package dev.simlink.gateway.calls
 import org.junit.Assert.*
 import org.junit.Test
 class CallPolicyTest {
+    @Test fun repairRequiresTheSameOriginalRecord() {
+        val old=CapturedCall(7,"+12025550123","missed",100,0)
+        assertTrue(matchesCapturedCall(old,7,old.number,"missed",100,0))
+        assertFalse(matchesCapturedCall(old,7,old.number,"missed",200,0))
+        assertFalse(matchesCapturedCall(old,7,"+12025550124","missed",100,0))
+        assertFalse(matchesCapturedCall(old,7,old.number,"incoming",100,0))
+        assertFalse(matchesCapturedCall(old,7,old.number,"missed",100,1))
+        assertFalse(matchesCapturedCall(old,8,old.number,"missed",100,0))
+    }
     @Test fun systemOutcomesDoNotInferMissedFromZeroDuration() {
         assertEquals("incoming",callOutcome(1))
         assertEquals("missed",callOutcome(3))

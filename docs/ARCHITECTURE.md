@@ -76,3 +76,5 @@ API新增 `modules/commands`，负责SQLite v6的持久命令、幂等、条件�
 ### 新来电同步
 
 后端 `modules/calls` 的 service 拥有数据事务、routes 拥有 HTTP schema/认证，推送仍由 push 模块处理。Web `features/calls` 分为 API 类型/请求、纯合并模型、轮询 hook、页面与局部样式。Android `calls` 拥有系统记录采集、持久进度和事件上传；`sync` 保留唯一完整同步入口与共用 incoming-event 加急任务；UI 留在 `ui/CallSettingsPage`。不把来电伪装成短信，不增加网络常驻服务或第二套心跳。来电读取不依赖网络，心跳总窗口保持原限制。行为/兼容与字段见 [CALLS](CALLS.md)。
+
+来电 SIM 解析集中于 Android `telephony/CallSimResolver` / `CallSimPolicy`，复用 `SimInventory`，不建立另一套卡身份。`calls/CallCollector` 读取来源事实，`CallStore` 原子保存归属补齐与重传，`CallSync` 使用带归属条件的 ACK 防止并发丢失。后端 calls service 处理单向补齐与设备归属验证；细节见 [来电规格](CALLS.md)。

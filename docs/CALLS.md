@@ -6,7 +6,7 @@
 
 Android 设置 → 来电同步，先正常授权 READ_CALL_LOG / READ_PHONE_STATE，再显式启用；默认关闭且绑定当前配对 generation。权限拒绝不影响短信。只采集本次启用之后开始的入站电话，不导入此前历史；重新启用建立新起点，原配对已经采集的待上传事件继续发送。关闭停止后续采集与上传，已有本地/服务端副本保留；关闭时已经发出的网络请求可能完成。
 
-只处理系统给出的 incoming / missed / rejected / blocked，忽略 outgoing、voicemail 和未知类型；不根据时长为零推断未接。号码受隐藏/限制时上传 null。首版所有来电 simKey 为 null：电话账户 ID 不是 subscriptionId，未验证映射前显示“SIM 未知”。不接管默认拨号角色、不访问通讯录、不接听、不远程拨号。
+只处理系统给出的 incoming / missed / rejected / blocked，忽略 outgoing、voicemail 和未知类型；不根据时长为零推断未接。号码受隐藏/限制时上传 null。读取系统记录的 PHONE_ACCOUNT_COMPONENT_NAME / PHONE_ACCOUNT_ID，通过 TelephonyManager.getSubscriptionId(PhoneAccountHandle) 解析订阅，再复用短信 SimInventory 的 local key。无需 ICCID 或新权限；账户缺失、失效或映射不唯一时显示“SIM 未知”，不按账户 ID、默认卡或唯一卡猜测。不接管默认拨号角色、不访问通讯录、不接听、不远程拨号。
 
 Web 增加「来电」导航，沿用白蓝、下划线筛选、移动详情与宽屏双栏。列表按来电原始时间倒序，API 每页 100 条，支持“更早记录”。SIM 标签使用单行高度；「全部 / 未接」为独立状态按钮，与 SIM 筛选取交集，未接数量按当前 SIM 范围统计。筛选对已加载记录生效。查看详情自动写入 viewedAt，单向已查看；这不改变系统通话结果，也不表示用户已经回拨。号码支持复制及 tel 链接交给当前设备拨号器确认。来电数据仅留在页面内存，不新增持久浏览器缓存。
 
@@ -26,6 +26,15 @@ Web 增加「来电」导航，沿用白蓝、下划线筛选、移动详情与�
 
 ## 服务端与兼容
 
-后端 `modules/calls/service.mjs` 拥有事务、去重、读取和状态上报，`routes.mjs` 只处理 schema 与认证。SQLite v12 追加 calls/call_status，保留原短信、身份、会话和推送数据。Android 本地 SQLite v6 追加 call_settings/call_events，不改变短信表。
+后端 `modules/calls/service.mjs` 拥有事务、去重、读取和状态上报，`routes.mjs` 只处理 schema 与认证。SQLite v12 追加 calls/call_status，保留原短信、身份、会话和推送数据。Android 本地 SQLite v7 在 v6 来电表上追加 sim_key 与 repair_cursor，不改变短信表或既有事件 ID。
 
 先升级后端/Web，再升级 APK。旧 Android 不上传来电，界面显示“尚未上报”；新版 Android 遇旧服务端来电接口 404 保留队列，短信继续。发现文档公开能力 `calls.receive.v1`。协议见 [API v1](API-V1.md)。设备撤销后不能上传；历史来电与短信一样保留。没有新增清理/删除接口，备份包含号码及记录，按已有私有数据备份规则处理。
+
+
+## SIM 归属补齐（0.5.1-call-sim）
+
+`telephony/CallSimResolver` 仅负责官方电话账户解析与现有 SIM 清单关联，`CallSimPolicy` 验证映射唯一性。采集时冻结 simKey，不随默认卡切换改写。Web 两个页面共用 SIM 备注；仅真实未归属记录进入“SIM 未知”。旧轮询不能把已知归属回退为空，最后一条未知记录补齐后筛选回到全部。
+
+开启来电同步后，每轮额外轮转检查最多 100 条本配对已采集但未知的记录；只按原 source ID 读取，核对号码、系统类型、开始时间与时长一致后，从空值补齐。包括重新启用之前已采集的旧记录，不导入此前未采集历史。原记录已删除、事实不匹配或电话账户失效时保持未知。已知归属不自动换卡。补齐与重新入队在同一事务；旧空归属请求的 ACK 不得清除新补齐的待上传状态。
+
+服务端保持 SQLite v12。相同事件和事实允许 simKey 从 null 补为该设备已上报的 key，保留 sequence、syncedAt、viewedAt，不重复通知。旧客户端 null 重放不擦除已知 key；改为另一已知 key 或修改其他事实仍返回 409。清单尚未包含 key 时返回可重试 503，等待设备清单上传。先升级服务端再安装 code15；旧服务端可能将历史补齐判为 409，保留在需处理队列，升级后主动重试。

@@ -8,7 +8,7 @@ export function configureHttp(app, staticRoot) {
   app.setErrorHandler((error, _req, reply) => {
     const status = error.validation
       ? 400
-      : error.statusCode >= 400 && error.statusCode < 500
+      : (error.statusCode >= 400 && error.statusCode < 500) || error.statusCode === 503
         ? error.statusCode
         : 500;
     if (status === 429 && Number.isFinite(error.retryAfter)) reply.header("Retry-After", String(error.retryAfter));
@@ -18,9 +18,11 @@ export function configureHttp(app, staticRoot) {
         error:
           status === 500
             ? "internal_error"
-            : error.validation
-              ? "invalid_request"
-              : error.message,
+            : status === 503
+              ? "service_unavailable"
+              : error.validation
+                ? "invalid_request"
+                : error.message,
       });
   });
   if (staticRoot) {

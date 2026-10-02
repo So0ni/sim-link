@@ -5,7 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** Schema owner. Opening a P0 database preserves messages and never enrolls historical SMS. */
-class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "gateway.db", null, 6) {
+class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "gateway.db", null, 7) {
     init { setWriteAheadLoggingEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE messages (id TEXT PRIMARY KEY, address TEXT NOT NULL, body TEXT NOT NULL, sub_id INTEGER NOT NULL, time INTEGER NOT NULL, outgoing INTEGER NOT NULL, interrupted INTEGER NOT NULL DEFAULT 0)")
@@ -15,6 +15,7 @@ class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(c
         createIdentity(db)
         createCommands(db)
         createCalls(db)
+        upgradeCallMapping(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createSyncTables(db)
@@ -22,6 +23,11 @@ class GatewayDatabase private constructor(context: Context) : SQLiteOpenHelper(c
         if (oldVersion < 4) createIdentity(db)
         if (oldVersion < 5) createCommands(db)
         if (oldVersion < 6) createCalls(db)
+        if (oldVersion < 7) upgradeCallMapping(db)
+    }
+    private fun upgradeCallMapping(db: SQLiteDatabase) {
+        db.execSQL("ALTER TABLE call_events ADD COLUMN sim_key TEXT")
+        db.execSQL("ALTER TABLE call_settings ADD COLUMN repair_cursor INTEGER NOT NULL DEFAULT 0")
     }
     private fun createCalls(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE call_settings(generation TEXT PRIMARY KEY,enabled INTEGER NOT NULL,since_at INTEGER NOT NULL,cursor INTEGER NOT NULL,checked_at INTEGER,notice TEXT NOT NULL DEFAULT '')")

@@ -9,3 +9,7 @@ fun callOutcome(type: Int): String? = when(type) {
     else -> null
 }
 fun scanCursor(saved: Long, observedMax: Long): Long = if(observedMax < saved) 0 else saved
+
+/** Provider ID reuse must not attribute an unrelated historical call. */
+fun matchesCapturedCall(old: CapturedCall,id: Long,number: String?,outcome: String?,started: Long,duration: Long): Boolean =
+    old.source == id && old.number == number && old.outcome == outcome && old.started == started && old.duration == duration

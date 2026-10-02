@@ -9,6 +9,9 @@ export function useCalls(api:ApiClient,path:string) {
   const [calls,setCalls]=useState<Call[]>([]),[devices,setDevices]=useState<CallStatus[]>([]),[sims,setSims]=useState<Sim[]>([]);
   const [error,setError]=useState(''),[loaded,setLoaded]=useState(false),[before,setBefore]=useState<string|null>(null),[filter,setFilter]=useState('all');
   const [busy,setBusy]=useState(false);
+  useEffect(()=>{
+    if(loaded && filter==='unknown' && !calls.some(c=>c.simKey===null))setFilter('all');
+  },[calls,loaded,filter]);
   const initial=useRef(true);
   const selectedId=/^\/calls\/(\d+)$/.exec(path)?.[1];
   const selected=calls.find(c=>String(c.sequence)===selectedId);

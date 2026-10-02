@@ -2,14 +2,24 @@ import { fail } from '../../platform/errors.mjs';
 const columns = `sequence,device_id AS deviceId,event_id AS eventId,number,outcome,started_at AS startedAt,
  duration_seconds AS durationSeconds,sim_key AS simKey,synced_at AS syncedAt,viewed_at AS viewedAt`;
 export function createCallsService(db,now,enqueue=()=>{}) {
+  const requireSim=(deviceId,key)=>{
+    if(key!==null && !db.prepare('SELECT 1 FROM sims WHERE device_id=? AND local_key=?').get(deviceId,key)) fail(503,'sim_not_reported');
+  };
   return {
     receive: db.transaction((device,body)=>{
       const values=[body.number,body.outcome,body.startedAt,body.durationSeconds,body.simKey];
       const old=db.prepare('SELECT * FROM calls WHERE device_id=? AND event_id=?').get(device.id,body.eventId);
       if(old){
-        if(JSON.stringify([old.number,old.outcome,old.started_at,old.duration_seconds,old.sim_key])!==JSON.stringify(values)) fail(409,'event_conflict');
+        if(JSON.stringify([old.number,old.outcome,old.started_at,old.duration_seconds])!==JSON.stringify(values.slice(0,4))) fail(409,'event_conflict');
+        if(old.sim_key!==null && body.simKey!==null && old.sim_key!==body.simKey) fail(409,'event_conflict');
+        // Monotonic enrichment; stale old clients cannot erase a known mapping or re-notify.
+        if(old.sim_key===null && body.simKey!==null) {
+          requireSim(device.id,body.simKey);
+          db.prepare('UPDATE calls SET sim_key=? WHERE sequence=?').run(body.simKey,old.sequence);
+        }
         return {eventId:body.eventId,sequence:old.sequence,syncedAt:old.synced_at,duplicate:true};
       }
+      requireSim(device.id,body.simKey);
       const stamp=now();
       if(body.startedAt>stamp+300000)fail(400,'started_at_in_future');
       const result=db.prepare('INSERT INTO calls(device_id,event_id,number,outcome,started_at,duration_seconds,sim_key,synced_at) VALUES(?,?,?,?,?,?,?,?)').run(device.id,body.eventId,...values,stamp);

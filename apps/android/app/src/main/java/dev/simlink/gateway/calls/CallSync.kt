@@ -24,9 +24,9 @@ class CallSync(private val context: Context) {
                     val ack=api.uploadCall(event,connection.token())
                     check(matchesAck(event.getString("eventId"),ack.getString("eventId"),ack.getLong("sequence"),ack.getLong("syncedAt")))
                     if(!active())return true
-                    store.complete(config.generation,event.getString("eventId"),"done")
+                    store.complete(config.generation,event,"done")
                 } catch(e: ApiFailure) {
-                    if(e.status==400 || e.status==409)store.complete(config.generation,event.getString("eventId"),"blocked") else throw e
+                    if(e.status==400 || e.status==409)store.complete(config.generation,event,"blocked") else throw e
                 }
             }
             return store.pending(config.generation)>0

@@ -190,7 +190,7 @@ SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、V
 
 ## 新来电同步（2026-10-02，SQLite v12）
 
-发现能力新增 `calls.receive.v1`。旧接口不变；推荐服务端先升级。Android 首版 simKey 固定 null，后续验证映射后再提供。
+发现能力新增 `calls.receive.v1`。旧接口不变；推荐服务端先升级。Android 0.5.1 起通过官方电话账户接口复用短信 simKey；无法确认时仍为 null。
 
 设备 Bearer `POST /api/v1/device/calls`，全部字段必填：
 
@@ -198,7 +198,7 @@ SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、V
 {"eventId":"fictional-call-1","number":"+12025550147","outcome":"missed","startedAt":1000,"durationSeconds":0,"simKey":null}
 ```
 
-`eventId` 1–128 字符；number 为 null 或 1–256 字符；outcome 为 incoming/missed/rejected/blocked；startedAt 非负安全整数毫秒（不得超过服务端时间 5 分钟）；durationSeconds 为 0–31536000 整数；simKey 为 null 或 36 字符 UUID 形状字符串。结果 `{eventId,sequence,syncedAt,duplicate}`；按 deviceId/eventId 唯一，所有业务字段参与冲突比较，同内容重放返回原 ACK，变化 409 event_conflict。事务提交后 ACK，并在同一事务内按时效为新 missed 创建私密推送任务。
+`eventId` 1–128 字符；number 为 null 或 1–256 字符；outcome 为 incoming/missed/rejected/blocked；startedAt 非负安全整数毫秒（不得超过服务端时间 5 分钟）；durationSeconds 为 0–31536000 整数；simKey 为 null 或 36 字符 UUID 形状字符串。结果 `{eventId,sequence,syncedAt,duplicate}`；按 deviceId/eventId 唯一，同内容重放返回原 ACK。simKey 允许从 null 单向补齐为该设备已上报的 key，保留原序号、同步/查看时间且不重复通知；null 重放不擦除已知 key。其他业务字段变化或已知 key 改为另一 key 返回 409 event_conflict。提供尚未归属该设备的 key 返回可重试 503 service_unavailable，设备需先上报 SIM 清单。事务提交后 ACK，并在同一事务内按时效为新 missed 创建私密推送任务。
 
 设备 Bearer `POST /api/v1/device/calls/status`：`{enabled:boolean,permission:boolean,checkedAt:number|null,pending:number}`，checkedAt 非负毫秒，不得超过服务器 5 分钟，pending 非负安全整数；返回 `{ok:true}`。状态为最近上报快照，不代表实时可用。未上报与 false 不混淆。
 

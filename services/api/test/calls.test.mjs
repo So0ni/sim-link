@@ -59,3 +59,27 @@ test('only recent missed calls enqueue one private push; old calls still persist
   await push.drain();assert.equal(payloads.length,1);assert.match(payloads[0].url,/^\/#\/calls\/\d+$/);assert.ok(!JSON.stringify(payloads[0]).includes(call.number));assert.equal(service.list().calls.length,3);
  }finally{db.close();}
 });
+test('SIM enrichment is device-owned, monotonic, idempotent and never re-notifies',async t=>{
+ const {app,headers,device,upload}=await setup(t);
+ const key='11111111-1111-4111-8111-111111111111';
+ const other='22222222-2222-4222-8222-222222222222';
+ const report={...upload,url:'/api/v1/device/sims',payload:{status:'available',sims:[{key,subscriptionId:1,slotIndex:0,carrier:'Fictional'}]}};
+ assert.equal((await app.inject(report)).statusCode,200);
+ const first=(await app.inject(upload)).json();
+ await app.inject({method:'POST',url:`/api/v1/calls/${first.sequence}/view`,headers});
+ const enriched={...upload,payload:{...call,simKey:key}};
+ assert.equal((await app.inject(enriched)).statusCode,200);
+ assert.equal((await app.inject(enriched)).json().duplicate,true);
+ assert.equal((await app.inject(upload)).statusCode,200);
+ let detail=(await app.inject({url:`/api/v1/calls/${first.sequence}`,headers})).json();
+ assert.equal(detail.simKey,key);assert.equal(detail.viewedAt,10000);assert.equal(detail.syncedAt,first.syncedAt);
+ assert.equal((await app.inject({...upload,payload:{...call,simKey:other}})).statusCode,409);
+ assert.equal((await app.inject({...upload,payload:{...call,eventId:'unknown-sim',simKey:other}})).statusCode,503);
+ const db=app.store;let pushes=0;
+ const service=createCallsService(db,()=>10000,()=>pushes++);
+ service.receive({id:device.deviceId},{...call,eventId:'notify-once'});
+ service.receive({id:device.deviceId},{...call,eventId:'notify-once',simKey:key});
+ assert.equal(pushes,1);
+ assert.throws(()=>service.receive({id:'different-device'},{...call,eventId:'foreign',simKey:key}));
+ assert.equal(service.get(first.sequence).simKey,key);
+});
