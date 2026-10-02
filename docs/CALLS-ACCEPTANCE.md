@@ -45,7 +45,7 @@ Android 模拟器 emulator-5554 / sdk_gphone16k_arm64 / Android 17；独立 QA �
 
 ## SIM 归属完整链路（2026-10-02，0.5.1-call-sim/code15）
 
-本次增量仅在本地隔离环境验证，未部署正式/测试服务器或安装真实手机。模拟器仍为 Pixel_10a / Android 17 / sdk_gphone16k_arm64，独立包名 dev.simlink.gateway.callsqa；从 code14 覆盖升级，数据库 v6 → v7。沿用虚构号码、隔离后端与 adb 页面点击、截图检查。
+本次功能验证在本地隔离环境完成；后续已部署正式/测试服务器并覆盖安装真实手机，部署证据见下节。模拟器仍为 Pixel_10a / Android 17 / sdk_gphone16k_arm64，独立包名 dev.simlink.gateway.callsqa；从 code14 覆盖升级，数据库 v6 → v7。沿用虚构号码、隔离后端与 adb 页面点击、截图检查。
 
 已通过：
 
@@ -59,3 +59,10 @@ Android 模拟器 emulator-5554 / sdk_gphone16k_arm64 / Android 17；独立 QA �
 - Android 单元测试覆盖两个订阅分别命中短信原 key、未知/歧义/无权限清单不猜唯一卡与默认卡、Provider 记录事实不匹配时拒绝修复。
 
 检查：后端 47 项测试、Web 40 项测试和 TypeScript/生产构建、Android 47 项 JVM 测试及标准 Debug 构建/Lint（0 错误）通过。模拟器只具有一个活动 SIM，双订阅策略通过单元测试验证；真实小米双卡、换卡、eSIM、厂商账户字段缺失、自然 Doze 和真实 Push 仍需真机验收。旧记录若已从系统删除或账户无法解析，保留未知。
+
+
+## 双环境发布与真机安装（2026-10-02）
+
+应用提交 `40a9f93` 已推送，包含 SIM 归属修复、来电紧凑条目/状态图标、设备同步状态集中展示、短信新建图标及统一页头。两套环境部署同一镜像 `simlink-api:20261002-40a9f93-amd64`，升级前分别停服备份数据与配置，保留旧镜像；后端仍为 SQLite v12，无新增迁移。两个容器健康、SQLite quick_check 通过，公网 Web/Worker/资源与本地构建逐字节一致，healthz 200、未认证来电接口 401。
+
+标准 Debug APK `0.5.1-call-sim/code15` 已通过 adb install -r 覆盖安装小米 24115RA8EC，包版本核对正确，启动成功；保留原应用数据。此次安装不等同真实短信/来电、双卡或长期后台验收。发布前后端 47 项、Web 40 项测试以及 Android Debug 构建/JVM 测试/Lint通过；Web 类型检查与构建通过。
