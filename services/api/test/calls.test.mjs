@@ -46,7 +46,7 @@ test('call status distinguishes unreported, disabled, denied and pending; pagina
  const second=(await app.inject({url:`/api/v1/calls?before=${first.nextCursor}`,headers})).json();assert.equal(second.calls.length,1);assert.equal(second.nextCursor,null);
  assert.equal(new Set([...first.calls,...second.calls].map(c=>c.sequence)).size,101);
 });
-test('only recent missed calls enqueue one private push; old calls still persist',async()=>{
+test('recent missed calls include number in notification body; old calls still persist',async()=>{
  const db=openStore(':memory:');let now=10_000_000;const payloads=[];
  try{
   db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run('hash','session',now+100000,now);
@@ -56,7 +56,9 @@ test('only recent missed calls enqueue one private push; old calls still persist
   const service=createCallsService(db,()=>now,push.enqueueCall);
   const fresh={...call,startedAt:now};service.receive({id:'d'},fresh);service.receive({id:'d'},fresh);
   service.receive({id:'d'},{...fresh,eventId:'answered',outcome:'incoming'});service.receive({id:'d'},{...call,eventId:'old'});
-  await push.drain();assert.equal(payloads.length,1);assert.match(payloads[0].url,/^\/#\/calls\/\d+$/);assert.ok(!JSON.stringify(payloads[0]).includes(call.number));assert.equal(service.list().calls.length,3);
+  await push.drain();assert.equal(payloads.length,1);assert.match(payloads[0].url,/^\/#\/calls\/\d+$/);assert.equal(payloads[0].preview,call.number);assert.ok(!payloads[0].body.includes(call.number));assert.equal(service.list().calls.length,3);
+  service.receive({id:'d'},{...fresh,eventId:'hidden-number',number:null});
+  await push.drain();assert.equal(payloads.length,2);assert.equal(payloads[1].preview,'号码未提供');
  }finally{db.close();}
 });
 test('SIM enrichment is device-owned, monotonic, idempotent and never re-notifies',async t=>{

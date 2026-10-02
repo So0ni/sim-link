@@ -105,7 +105,9 @@ export function createPushService(db, now, origin, send = sendNotification) {
           try {
             const message = job.preview_length > 0 && /^message:\d+$/.test(job.event_key)
               ? db.prepare('SELECT body FROM messages WHERE sequence=?').get(Number(job.event_key.slice(8))) : null;
-            const preview = message ? messagePreview(message.body,job.preview_length) : '';
+            const call = /^call:\d+$/.test(job.event_key)
+              ? db.prepare('SELECT number FROM calls WHERE sequence=?').get(Number(job.event_key.slice(5))) : null;
+            const preview = call ? (call.number?.trim() || '号码未提供') : message ? messagePreview(message.body,job.preview_length) : '';
             await send({endpoint:job.endpoint,keys:{p256dh:job.p256dh,auth:job.auth}},JSON.stringify({
               ...(preview ? {preview} : {}),jobId:job.id,title:'SIMLink',body:job.event_key.startsWith('call:')?'收到一通未接来电，点击查看。':job.event_key.startsWith('test:')?'SIMLink 测试：通知已开启。':`${job.sender} 发来一条短信`,url:job.url,tag:job.event_key,sessionId:job.session_id,
             }),{TTL:Math.max(1,Math.floor((job.expires_at-now())/1000)),timeout:10000,urgency:'high',

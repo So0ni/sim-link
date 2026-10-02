@@ -190,6 +190,8 @@ SQLite v10仅为push_jobs增加三个可空阶段时间字段，保留短信、V
 
 ## 新来电同步（2026-10-02，SQLite v12）
 
+未接来电 Web Push 的 `body` 用作提醒标题，`preview` 用作通知正文，包含来电号码或“号码未提供”，独立于短信 `previewLength` 设置。沿用 Worker 会话验证与详情链接，不新增数据库字段。
+
 发现能力新增 `calls.receive.v1`。旧接口不变；推荐服务端先升级。Android 0.5.1 起通过官方电话账户接口复用短信 simKey；无法确认时仍为 null。
 
 设备 Bearer `POST /api/v1/device/calls`，全部字段必填：

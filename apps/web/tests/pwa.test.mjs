@@ -140,6 +140,7 @@ test('slow session check falls back privately without waiting for another push; 
  assert.equal(signal.aborted,true);assert.equal(shown[0].body,'打开 SIMLink 查看新通知');assert.equal(badges.length,0);
  mode='online';fire();await pending;assert.equal(shown[1].title,payload.body);assert.equal(shown[1].body,undefined);assert.deepEqual(badges,[530]);
  payload.preview='Fictional SMS preview';fire();await pending;assert.equal(shown[2].title,payload.body);assert.equal(shown[2].body,payload.preview);
+ Object.assign(payload,{body:'收到一通未接来电，点击查看。',preview:'+12025550190',url:'/#/calls/7',tag:'call:7'});fire();await pending;assert.equal(shown[3].title,payload.body);assert.equal(shown[3].body,'+12025550190');assert.equal(shown[3].data.url,'/#/calls/7');
  assert.ok(reports.some(r=>r.shownAt===null));assert.ok(reports.some(r=>Number.isSafeInteger(r.shownAt)));
 });
 test('logout during verification suppresses stale notification and clears badge',async()=>{
