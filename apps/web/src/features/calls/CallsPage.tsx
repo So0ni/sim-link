@@ -1,7 +1,9 @@
+import { BackLink } from '../../shared/ui/BackLink.tsx';
+import { ConversationTime } from '../../shared/ui/ConversationTime.tsx';
 import { CallOutcomeIcon } from './CallOutcomeIcon.tsx';
 import { useState } from 'react';
 import { useCalls } from './useCalls.ts';
-import { Phone, ArrowLeft } from '@phosphor-icons/react';
+import { Phone } from '@phosphor-icons/react';
 import { ApiClient } from '../../shared/api/client.ts';
 import { PageBrand } from '../../shared/ui/PageBrand.tsx';
 import { simTitle } from '../sims/api.ts';
@@ -28,11 +30,11 @@ export function CallsPage({api,path}:{api:ApiClient;path:string}) {
       {!loaded&&!error&&<p role="status">正在读取来电…</p>}
       {loaded&&shown.length===0&&<div className="call-empty"><Phone size={36}/><h2>{missedOnly?'没有未接来电':'暂无来电记录'}</h2><p>{missedOnly?'当前 SIM 范围内没有已加载的未接来电。':'在 Android 设置中启用「来电同步」后，新来电会显示在这里。'}</p>{missedOnly&&<button className="text-button" onClick={()=>setMissedOnly(false)}>查看全部</button>}</div>}
       {shown.map(c=><a key={c.sequence} href={`#/calls/${c.sequence}`} className={`call-row ${String(c.sequence)===selectedId?'selected':''}`} aria-current={String(c.sequence)===selectedId?'true':undefined}>
-        <CallOutcomeIcon outcome={c.outcome}/><div><strong>{c.number??'号码未提供'}</strong><p>{outcomeLabel[c.outcome]}{c.viewedAt===null?' · 未查看':''}</p><small>{new Date(c.startedAt).toLocaleString()} · {simLabel(c)}</small></div>
+        <CallOutcomeIcon outcome={c.outcome}/><div className="row-content"><div className="row-heading"><strong>{c.number??'号码未提供'}</strong><ConversationTime at={c.startedAt} now={Date.now()}/></div><p>{outcomeLabel[c.outcome]}</p><span className="sim-tag">{simLabel(c)}</span></div>
       </a>)}
       {before&&<button className="secondary" disabled={busy} onClick={()=>void loadMore()}>更早记录</button>}
     </section><section className="call-detail" aria-label="来电详情">
-      {selected?<><a href="#/calls" className="call-back"><ArrowLeft size={20}/>返回来电</a><p className="field-help">{outcomeLabel[selected.outcome]}</p><h2>{selected.number??'号码未提供'}</h2>
+      {selected?<><BackLink href="#/calls">返回来电</BackLink><p className="field-help">{outcomeLabel[selected.outcome]}</p><h2>{selected.number??'号码未提供'}</h2>
         <dl><dt>来电时间</dt><dd>{new Date(selected.startedAt).toLocaleString()}</dd><dt>留守设备</dt><dd>{devices.find(d=>d.id===selected.deviceId)?.name??'原设备'}</dd><dt>接收 SIM</dt><dd>{simLabel(selected)}</dd>{selected.outcome==='incoming'&&<><dt>通话时长</dt><dd>{selected.durationSeconds} 秒</dd></>}<dt>同步时间</dt><dd>{new Date(selected.syncedAt).toLocaleString()}</dd></dl>
         <div className="call-actions">{selected.number&&<button className="secondary" onClick={async()=>{try{await navigator.clipboard.writeText(selected.number!);setNotice('号码已复制');}catch{setNotice('复制失败，请长按号码复制。');}}}>复制号码</button>}{dialNumber(selected.number)&&<a className="primary" href={`tel:${dialNumber(selected.number)}`}>用当前手机拨打</a>}</div><p className="field-help">通过当前设备的拨号应用回拨。查看记录不代表已回电。</p><p role="status">{notice}</p></>:<p className="field-help">{selectedId?'正在读取记录…':'选择一条来电查看详情'}</p>}
     </section></div>

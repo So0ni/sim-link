@@ -1,14 +1,15 @@
 .calls-page { max-width:1280px; }
 .calls-layout { display:grid; grid-template-columns:minmax(280px,1fr) minmax(280px,1fr); gap:32px; }
-.call-row { display:flex; gap:14px; align-items:center; padding:20px 12px; border-bottom:1px solid var(--borderSubtle); color:inherit; text-decoration:none; overflow-wrap:anywhere; }
+.call-row { display:flex; gap:12px; align-items:flex-start; padding:18px 20px 16px; border-bottom:1px solid var(--borderSubtle); color:inherit; text-decoration:none; overflow-wrap:anywhere; }
 .call-row.selected { background:var(--primarySubtle,#edf4ff); }
-.call-outcome-icon { display:flex; align-items:center; justify-content:center; flex:0 0 40px; height:40px; border-radius:50%; }
+.call-outcome-icon { display:flex; align-items:center; justify-content:center; flex:0 0 36px; height:36px; border-radius:50%; }
 .call-outcome-icon.is-incoming { color:var(--successText); background:var(--successSurface); }
 .call-outcome-icon.is-missed { color:var(--dangerText); background:var(--dangerSurface); }
 .call-outcome-icon.is-rejected { color:var(--warningText); background:var(--warningSurface); }
 .call-outcome-icon.is-blocked { color:var(--textSecondary); background:var(--surfaceSubtle); }
-.call-row p { margin:6px 0; }
-.call-row small,.call-empty p { color:var(--textSecondary); }
+.call-row p { margin:4px 0 0; }
+.call-row .row-heading strong { font-weight:600; }
+.call-empty p { color:var(--textSecondary); }
 .call-detail { padding:20px; border-left:1px solid var(--borderSubtle); overflow-wrap:anywhere; }
 .call-detail h2 { font-size:26px; user-select:text; }
 .call-detail dl { display:grid; grid-template-columns:auto 1fr; gap:16px; margin:28px 0; }
@@ -16,7 +17,7 @@
 .call-detail dd { margin:0; }
 .call-actions { display:flex; gap:12px; flex-wrap:wrap; }
 .call-actions a { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:10px 16px; border-radius:12px; text-decoration:none; }
-.call-back { display:inline-flex; gap:8px; align-items:center; min-height:44px; }
+
 .call-empty { padding:40px 12px; }
 @media(max-width:767px) {
  .calls-layout { display:block; }
@@ -26,3 +27,5 @@
 }
 .call-row.selected { background:var(--surfaceSelected); }
 .call-detail dd { min-width:0; }
+
+@media(max-width:799px) { .call-row { padding-bottom:12px; } }

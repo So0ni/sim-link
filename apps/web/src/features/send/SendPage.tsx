@@ -1,6 +1,7 @@
+import { BackLink } from '../../shared/ui/BackLink.tsx';
 import { ConversationTime } from "../../shared/ui/ConversationTime.tsx";
 import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
-import { PageBrand } from "../../shared/ui/PageBrand.tsx";
+import { SmsPageHeader } from "../../shared/ui/SmsPageHeader.tsx";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, errorText } from '../../shared/api/client.ts';
 import { ForegroundPoller } from '../../shared/api/polling.ts';
@@ -73,7 +74,7 @@ export function SendPage({api,path,visible,onSent}:{api:ApiClient;path:string;vi
     }finally{inFlight.current=false;setBusy(false);}
   }
   return <main className="main live-page send-page" hidden={!visible}><div className="send-content">
-    <PageBrand /><div className="title-row send-heading"><h1>新建短信</h1><a className="send-back" href="#/inbox">返回收件箱</a></div>
+    <div><SmsPageHeader/><BackLink href="#/inbox">返回短信</BackLink></div>
     <section className="live-card"><h2>新建会话</h2>
       <p className="field-help">使用实体 SIM 发送，可能产生运营商费用。手机后台可能延迟，系统可能要求确认发送。</p>
       <label>发送 SIM<select value={simId} disabled={busy||!!attempt} onChange={e=>{drafts.current.set(JSON.stringify([simId,recipient]),body);const next=JSON.stringify([e.target.value,recipient]);setSim(e.target.value);setBody(drafts.current.get(next)??'');context.current=next;}}><option value="">请选择发送卡</option>{sims.map(s=><option value={s.id} key={s.id}>{simTitle(s)} · {devices.find(d=>d.id===s.deviceId)?.name??'原设备'}{s.state==='active'?'':'（不可用）'}</option>)}</select></label>

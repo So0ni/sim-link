@@ -1,10 +1,10 @@
 import { ConversationTime } from "../../shared/ui/ConversationTime.tsx";
-import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
-import { PageBrand } from "../../shared/ui/PageBrand.tsx";
+import { SmsPageHeader } from "../../shared/ui/SmsPageHeader.tsx";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   EnvelopeSimple,
+  NotePencil,
 } from "@phosphor-icons/react";
 import type { ApiClient } from "../../shared/api/client.ts";
 import { useVisibleReading } from "./useVisibleReading.ts";
@@ -57,12 +57,7 @@ export function InboxPage({
     <main hidden={!visible} className={`main inbox-layout ${selected ? "has-detail" : ""}`}>
       <section className="inbox-list" aria-label="短信列表">
         <div className="list-top">
-          <PageBrand />
-          <div className="title-row">
-            <h1>短信</h1>
-            <a className="text-button" href="#/send">新建短信</a>
-            <RefreshButton label="刷新短信" onRefresh={inbox.refresh} />
-          </div>
+          <SmsPageHeader action={<a className="compose-button" href="#/send" title="新建短信" aria-label="新建短信"><NotePencil size={24} aria-hidden="true" /></a>} />
           <div
             className="sim-tabs live-tabs"
             role="group"
