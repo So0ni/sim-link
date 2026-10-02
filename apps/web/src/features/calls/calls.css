@@ -2,7 +2,11 @@
 .calls-layout { display:grid; grid-template-columns:minmax(280px,1fr) minmax(280px,1fr); gap:32px; }
 .call-row { display:flex; gap:14px; align-items:center; padding:20px 12px; border-bottom:1px solid var(--borderSubtle); color:inherit; text-decoration:none; overflow-wrap:anywhere; }
 .call-row.selected { background:var(--primarySubtle,#edf4ff); }
-.call-row svg { flex-shrink:0; color:var(--primary); }
+.call-outcome-icon { display:flex; align-items:center; justify-content:center; flex:0 0 40px; height:40px; border-radius:50%; }
+.call-outcome-icon.is-incoming { color:var(--successText); background:var(--successSurface); }
+.call-outcome-icon.is-missed { color:var(--dangerText); background:var(--dangerSurface); }
+.call-outcome-icon.is-rejected { color:var(--warningText); background:var(--warningSurface); }
+.call-outcome-icon.is-blocked { color:var(--textSecondary); background:var(--surfaceSubtle); }
 .call-row p { margin:6px 0; }
 .call-row small,.call-empty p { color:var(--textSecondary); }
 .call-detail { padding:20px; border-left:1px solid var(--borderSubtle); overflow-wrap:anywhere; }
@@ -14,12 +18,10 @@
 .call-actions a { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:10px 16px; border-radius:12px; text-decoration:none; }
 .call-back { display:inline-flex; gap:8px; align-items:center; min-height:44px; }
 .call-empty { padding:40px 12px; }
-.call-status { margin-top:32px; padding:20px 0; border-top:1px solid var(--borderSubtle); }
-.call-status summary { cursor:pointer; min-height:44px; }
 @media(max-width:767px) {
  .calls-layout { display:block; }
  .call-detail { display:none; border:0; padding:0; }
- .call-detail-open .calls-list,.call-detail-open>.sim-tabs,.call-detail-open>.reading-filter,.call-detail-open>.call-status { display:none; }
+ .call-detail-open .calls-list,.call-detail-open>.sim-tabs,.call-detail-open>.reading-filter { display:none; }
  .call-detail-open .call-detail { display:block; }
 }
 .call-row.selected { background:var(--surfaceSelected); }

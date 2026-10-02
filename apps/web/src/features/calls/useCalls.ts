@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiClient, ApiError, errorText } from '../../shared/api/client.ts';
 import { ForegroundPoller } from '../../shared/api/polling.ts';
 import { listSims, type Sim } from '../sims/api.ts';
-import { listCalls, listCallStatus, getCall, viewCall, type Call, type CallStatus } from './api.ts';
+import { listDevices, type Device } from '../devices/api.ts';
+import { listCalls, getCall, viewCall, type Call } from './api.ts';
 import { mergeCalls } from './model.ts';
 
 export function useCalls(api:ApiClient,path:string) {
-  const [calls,setCalls]=useState<Call[]>([]),[devices,setDevices]=useState<CallStatus[]>([]),[sims,setSims]=useState<Sim[]>([]);
+  const [calls,setCalls]=useState<Call[]>([]),[devices,setDevices]=useState<Device[]>([]),[sims,setSims]=useState<Sim[]>([]);
   const [error,setError]=useState(''),[loaded,setLoaded]=useState(false),[before,setBefore]=useState<string|null>(null),[filter,setFilter]=useState('all');
   const [busy,setBusy]=useState(false);
   useEffect(()=>{
@@ -21,12 +22,12 @@ export function useCalls(api:ApiClient,path:string) {
 
     const poller=new ForegroundPoller(async()=>{
       try {
-        const [result,status,inventory]=await Promise.all([listCalls(api,controller.signal),listCallStatus(api,controller.signal),listSims(api,controller.signal)]);
+        const [result,deviceList,inventory]=await Promise.all([listCalls(api,controller.signal),listDevices(api,controller.signal),listSims(api,controller.signal)]);
         let detail:Call|undefined;
         if(selectedId&&!result.calls.some(c=>String(c.sequence)===selectedId))detail=await getCall(api,Number(selectedId),controller.signal);
         if(controller.signal.aborted)return false;
         setCalls(previous=>mergeCalls(previous,[...result.calls,...(detail?[detail]:[])]));
-        setDevices(status.devices);setSims(inventory.sims);if(initial.current){setBefore(result.nextCursor);initial.current=false;}setError('');setLoaded(true);return true;
+        setDevices(deviceList.devices);setSims(inventory.sims);if(initial.current){setBefore(result.nextCursor);initial.current=false;}setError('');setLoaded(true);return true;
       }catch(e){if(!controller.signal.aborted)setError(e instanceof ApiError&&e.status===404?'服务器尚未支持来电功能，或此记录不存在。':errorText(e));return false;}
     },()=>document.visibilityState==='visible'&&navigator.onLine);
     poller.start();document.addEventListener('visibilitychange',poller.wake);window.addEventListener('online',poller.wake);

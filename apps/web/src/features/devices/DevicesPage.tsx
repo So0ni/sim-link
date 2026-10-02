@@ -1,3 +1,5 @@
+import { listCallStatus, type CallStatus } from "../calls/api.ts";
+import { ApiError } from "../../shared/api/client.ts";
 import { DeviceCard } from "./DeviceCard.tsx";
 import { RefreshButton } from "../../shared/ui/RefreshButton.tsx";
 import { PageBrand } from "../../shared/ui/PageBrand.tsx";
@@ -25,6 +27,9 @@ export function DevicesPage({ api }: { api: ApiClient }) {
   const [devices, setDevices] = useState<Device[]>(cached?.devices??[]);
   const [pairing, setPairing] = useState<Pairing | null>(null);
   useEffect(()=>{if(pairing)pairingPanel.current?.scrollIntoView({behavior:"smooth",block:"start"});},[pairing]);
+  const [callsLoaded,setCallsLoaded]=useState(false);
+  const [calls,setCalls]=useState<CallStatus[]>([]);
+  const [callError,setCallError]=useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -35,9 +40,11 @@ export function DevicesPage({ api }: { api: ApiClient }) {
   const refresh=useCallback(():Promise<void>=>{
     if(pending.current)return pending.current;
     const controller=new AbortController();active.current=controller;setLoading(true);
-    const task=Promise.all([listDevices(api,controller.signal),listSims(api,controller.signal),listRecoverableDevices(api,controller.signal)])
-      .then(([result,inventory,retired])=>{
+    const task=Promise.all([listDevices(api,controller.signal),listSims(api,controller.signal),listRecoverableDevices(api,controller.signal),
+      listCallStatus(api,controller.signal).then(result=>({devices:result.devices,error:''})).catch(err=>({devices:[] as CallStatus[],error:err instanceof ApiError && err.status===404?'服务器尚未支持来电状态，请升级服务端。':'来电状态获取失败，请刷新重试。'}))])
+      .then(([result,inventory,retired,callStatus])=>{
         if(controller.signal.aborted)return;
+        setCalls(callStatus.devices);setCallError(callStatus.error);setCallsLoaded(true);
         const stamp=Date.now();setDevices(result.devices);setSims(inventory.sims);setRecoverable(retired.devices);setUpdatedAt(stamp);setError("");
         api.views.set("devices",{devices:result.devices,sims:inventory.sims,recoverable:retired.devices,updatedAt:stamp});
       }).catch(err=>{if(!controller.signal.aborted)setError(errorText(err));})
@@ -81,7 +88,7 @@ export function DevicesPage({ api }: { api: ApiClient }) {
       <section className="paired-devices" aria-label="已配对设备">
         <div className="paired-heading"><h2>已配对设备</h2><span>{devices.length} 台</span></div>
         {loading && !updatedAt ? <p className="field-help">正在加载…</p> : !devices.length && <p className="field-help">还没有已配对设备，请在下方添加。</p>}
-        {devices.map(device=><DeviceCard key={device.id} device={device} sims={sims.filter(s=>s.deviceId===device.id)} api={api} busy={busy}
+        {devices.map(device=><DeviceCard key={device.id} device={device} calls={calls.find(c=>c.deviceId===device.id)} callError={callError} callLoading={!callsLoaded} sims={sims.filter(s=>s.deviceId===device.id)} api={api} busy={busy}
           saved={()=>setReload(v=>v+1)} recover={()=>void recover(device)} revoke={async()=>{
             if(!window.confirm(`解除“${device.name}”的配对并移除设备条目？凭证立即失效，已保存短信保留。`))return;
             setBusy(true);setError("");
